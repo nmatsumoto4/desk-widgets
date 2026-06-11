@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+  <title>Game Widget</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="header">
+      <span id="title">2048</span>
+      <div id="scores">
+        <div class="score-box">
+          <span class="score-label">SCORE</span>
+          <span id="score">0</span>
+        </div>
+        <div class="score-box">
+          <span class="score-label">BEST</span>
+          <span id="best">0</span>
+        </div>
+      </div>
+      <div id="header-btns">
+        <button id="mode-btn" title="ゲーム切替"></button>
+        <button id="add-btn" title="ウィジェット追加">＋</button>
+        <button id="cat-btn" title="猫を呼ぶ">🐱</button>
+        <button id="close-btn" title="終了">×</button>
+      </div>
+    </header>
+
+    <div id="stage">
+      <div id="board"></div>
+      <div id="puyo"><canvas id="puyo-canvas"></canvas></div>
+      <div id="rush"><canvas id="rush-canvas"></canvas></div>
+      <div id="overlay">
+        <span id="overlay-title"></span>
+        <span id="overlay-sub"></span>
+      </div>
+    </div>
+
+    <footer id="footer">
+      <span id="mode-indicator">AI 自動運転中</span>
+      <span id="rush-ctrl">
+        <button id="rush-minus" title="車を減らす">−</button>
+        <span id="rush-cars-label"></span>
+        <button id="rush-plus" title="車を増やす">＋</button>
+      </span>
+      <span id="games-count"></span>
+    </footer>
+  </div>
+
+  <script src="game.js"></script>
+  <script src="ai.js"></script>
+  <script src="mod2048.js"></script>
+  <script src="puyo.js"></script>
+  <script src="puyo-ai.js"></script>
+  <script src="mod-puyo.js"></script>
+  <script src="rush.js"></script>
+  <script src="mod-rush.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

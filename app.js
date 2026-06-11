@@ -1,0 +1,140 @@
+// ウィジェット共通コントローラ
+// モード切替（2048 ⇄ ぷよぷよ）・フォーカスによる手動/AI 切替・
+// ウィジェット複製・スコア表示・オーバーレイを一元管理する
+
+(() => {
+  const MODE_KEY = 'widget.mode';
+  const MODE_ORDER = ['2048', 'puyo', 'rush'];
+  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour' };
+  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush' };
+
+  const titleEl = document.getElementById('title');
+  const scoreEl = document.getElementById('score');
+  const bestEl = document.getElementById('best');
+  const infoEl = document.getElementById('games-count');
+  const modeIndicatorEl = document.getElementById('mode-indicator');
+  const overlayEl = document.getElementById('overlay');
+  const overlayTitleEl = document.getElementById('overlay-title');
+  const overlaySubEl = document.getElementById('overlay-sub');
+  const modeBtn = document.getElementById('mode-btn');
+  const addBtn = document.getElementById('add-btn');
+  const closeBtn = document.getElementById('close-btn');
+
+  const ctx = {
+    showOverlay(title, sub) {
+      overlayTitleEl.textContent = title;
+      overlaySubEl.textContent = sub;
+      overlayEl.classList.add('visible');
+    },
+    hideOverlay() {
+      overlayEl.classList.remove('visible');
+    },
+    setScores(score, best, info) {
+      scoreEl.textContent = score;
+      bestEl.textContent = best;
+      infoEl.textContent = info || '';
+    }
+  };
+
+  const widgets = {
+    '2048': window.createWidget2048(ctx),
+    puyo: window.createWidgetPuyo(ctx),
+    rush: window.createWidgetRush(ctx)
+  };
+
+  // 起動モード：URL パラメータ > 前回の選択 > 2048
+  const params = new URLSearchParams(location.search);
+  let mode = params.get('mode') || localStorage.getItem(MODE_KEY) || '2048';
+  if (!widgets[mode]) mode = '2048';
+  let active = widgets[mode];
+  let manual = false;
+
+  function nextMode() {
+    return MODE_ORDER[(MODE_ORDER.indexOf(mode) + 1) % MODE_ORDER.length];
+  }
+
+  function applyLabels() {
+    titleEl.textContent = GAME_TITLES[mode];
+    modeBtn.textContent = GAME_SHORT[nextMode()];
+    modeBtn.title = `${GAME_TITLES[nextMode()]} に切替`;
+  }
+
+  function setManual(m) {
+    manual = m;
+    document.body.classList.toggle('focused', m);
+    active.setAuto(!m);
+    modeIndicatorEl.textContent = m ? '手動モード（クリックで AI 再開）' : 'AI 自動運転中';
+    modeIndicatorEl.classList.toggle('manual', m);
+  }
+
+  function switchMode() {
+    active.hide();
+    ctx.hideOverlay();
+    mode = nextMode();
+    localStorage.setItem(MODE_KEY, mode);
+    active = widgets[mode];
+    applyLabels();
+    active.show();
+    active.setAuto(!manual);
+  }
+
+  modeBtn.addEventListener('click', switchMode);
+
+  addBtn.addEventListener('click', () => {
+    if (window.widgetAPI) {
+      window.widgetAPI.newWidget(mode);
+    } else {
+      // ブラウザで開いている場合のフォールバック
+      window.open(`${location.pathname}?mode=${mode}`, '_blank',
+        'width=280,height=360');
+    }
+  });
+
+  closeBtn.addEventListener('click', () => window.close());
+
+  document.getElementById('cat-btn').addEventListener('click', () => {
+    if (window.widgetAPI) {
+      window.widgetAPI.newCat();
+    } else {
+      window.open('cat.html', '_blank', 'width=190,height=230');
+    }
+  });
+
+  // フッターの表示はボタンを兼ねる：手動モード中にクリックすると AI を再開
+  modeIndicatorEl.addEventListener('click', () => {
+    if (manual) setManual(false);
+  });
+
+  window.addEventListener('focus', () => setManual(true));
+  window.addEventListener('blur', () => setManual(false));
+
+  window.addEventListener('keydown', (e) => {
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    e.preventDefault();
+    // フォーカス中に矢印キーを押したら（AI 再開ボタン押下後でも）手動に戻す
+    if (!manual) setManual(true);
+    active.key(e);
+  });
+
+  // ウィンドウリサイズ（DnD でのサイズ変更）に追従
+  // ※ rAF は非表示時に発火しないため setTimeout でデバウンスする
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => active.relayout(), 50);
+  });
+
+  // ---- 起動 ----
+  applyLabels();
+  active.show();
+  setManual(document.hasFocus());
+
+  // テスト・デバッグ用フック（UI からは使わない）
+  window.__widget = {
+    widgets,
+    get mode() { return mode; },
+    get active() { return active; },
+    switchMode,
+    setManual
+  };
+})();

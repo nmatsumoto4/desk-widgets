@@ -1,0 +1,49 @@
+{
+  "name": "desk-widgets",
+  "version": "1.0.0",
+  "description": "Desktop widgets: self-playing 2048 / Puyo Puyo / Rush Hour + a pixel-art desktop cat",
+  "main": "main.js",
+  "author": "nmatsumoto4",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^26.15.2",
+    "ws": "^8.21.0"
+  },
+  "build": {
+    "appId": "jp.nmatsumoto4.deskwidgets",
+    "productName": "DeskWidgets",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!docs/**",
+      "!dist/**",
+      "!.claude/**",
+      "!*.md"
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "identity": null,
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ]
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
+  }
+}
