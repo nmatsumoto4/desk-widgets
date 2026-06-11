@@ -1,7 +1,7 @@
 {
   "name": "desk-widgets",
-  "version": "1.0.0",
-  "description": "Desktop widgets: self-playing 2048 / Puyo Puyo / Rush Hour + a pixel-art desktop cat",
+  "version": "1.0.1",
+  "description": "Desktop widgets: self-playing 2048 / Puyo Puyo / Rush Hour",
   "main": "main.js",
   "author": "nmatsumoto4",
   "license": "MIT",
