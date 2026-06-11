@@ -92,14 +92,6 @@
 
   closeBtn.addEventListener('click', () => window.close());
 
-  document.getElementById('cat-btn').addEventListener('click', () => {
-    if (window.widgetAPI) {
-      window.widgetAPI.newCat();
-    } else {
-      window.open('cat.html', '_blank', 'width=190,height=230');
-    }
-  });
-
   // フッターの表示はボタンを兼ねる：手動モード中にクリックすると AI を再開
   modeIndicatorEl.addEventListener('click', () => {
     if (manual) setManual(false);
