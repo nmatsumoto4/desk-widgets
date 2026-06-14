@@ -37,14 +37,14 @@ window.createWidgetPuyo = function (ctx) {
   replayBtn.addEventListener('click', playReplay);
   const PUYO_COLORS = ['', '#e74c3c', '#27ae60', '#3498db', '#f1c40f'];
 
-  // ぷよのドット絵（14×14）。B=本体 / D=影 / H=ツヤ / W=白目 / P=瞳 / .=透明
-  // 辺はセル端まで埋め、角だけ落とす → 同色が隣り合うと自然につながって見える（本家風）
+  // ぷよ（スライム）のドット絵（14×14）。B=本体 / D=影 / H=ツヤ / G=光沢 / W=白目 / P=瞳 / .=透明
+  // 角を丸めて艶やかなスライム感に。辺は概ね埋めて同色は隣接でつながる
   const PUYO_SPRITE = [
+    '..BBBBBBBBBB..',
     '.BBBBBBBBBBBB.',
     'BBBBBBBBBBBBBB',
-    'BBBBBBBBBBBBBB',
-    'BBHHBBBBBBBBBB',
-    'BBHHBBBBBBBBBB',
+    'BGHHBBBBBBBBBB',
+    'BHHHBBBBBBBBBB',
     'BBBBBBBBBBBBBB',
     'BWWWBBBBWWWBBB',
     'BWPWBBBBWPWBBB',
@@ -52,8 +52,8 @@ window.createWidgetPuyo = function (ctx) {
     'BBBBBBBBBBBBBB',
     'BBBBBBBBBBBBBB',
     'DDBBBBBBBBBBDD',
-    'DDDDDDDDDDDDDD',
-    '.DDDDDDDDDDDD.'
+    '.DDDDDDDDDDDD.',
+    '..DDDDDDDDDD..'
   ];
 
   function shadeDark(hex) {
@@ -65,10 +65,13 @@ window.createWidgetPuyo = function (ctx) {
     return `rgb(${m(n >> 16 & 255)},${m(n >> 8 & 255)},${m(n & 255)})`;
   }
 
-  function drawPuyoSprite(x, y, size, color, alpha = 1) {
+  // sxs/sys は接地中心（下端中央）まわりのスクワッシュ&ストレッチ倍率
+  function drawPuyoSprite(x, y, size, color, alpha = 1, sxs = 1, sys = 1) {
     const base = PUYO_COLORS[color];
-    const colMap = { B: base, D: shadeDark(base), H: shadeLight(base), W: '#ffffff', P: '#3a3a3a' };
+    const colMap = { B: base, D: shadeDark(base), H: shadeLight(base), G: '#ffffff', W: '#ffffff', P: '#3a3a3a' };
     const dot = size / 14;
+    const cx = x + size / 2, by = y + size;
+    const dw = dot * sxs + 0.6, dh = dot * sys + 0.6;
     g2d.globalAlpha = alpha;
     for (let pr = 0; pr < 14; pr++) {
       const row = PUYO_SPRITE[pr];
@@ -76,7 +79,9 @@ window.createWidgetPuyo = function (ctx) {
         const ch = row[pc];
         if (ch === '.') continue;
         g2d.fillStyle = colMap[ch];
-        g2d.fillRect(x + pc * dot, y + pr * dot, dot + 0.6, dot + 0.6);
+        const px = cx + (x + pc * dot - cx) * sxs;
+        const py = by + (y + pr * dot - by) * sys;
+        g2d.fillRect(px, py, dw, dh);
       }
     }
     g2d.globalAlpha = 1;
@@ -104,6 +109,7 @@ window.createWidgetPuyo = function (ctx) {
   let chainLabelTicks = 0; // 「n 連鎖!」表示の残りティック
   const makeVoff = () => Array.from({ length: H }, () => new Array(W).fill(0));
   let voff = makeVoff();   // 各セルの落下アニメ用オフセット（行単位・負=上）
+  let vvel = makeVoff();   // 落下アニメの速度（スプリング・スライム挙動用）
   let chainSeed = null;    // 連鎖シーケンス開始時の盤面（記録用）
   let replaying = false;   // リプレイ再生中フラグ
 
@@ -164,12 +170,13 @@ window.createWidgetPuyo = function (ctx) {
       const colors = [], froms = [];
       for (let r = 0; r < H; r++) {
         if (grid[r][c] !== 0) { colors.push(grid[r][c]); froms.push(r); }
-        grid[r][c] = 0; voff[r][c] = 0;
+        grid[r][c] = 0; voff[r][c] = 0; vvel[r][c] = 0;
       }
       let r = H - 1;
       for (let i = colors.length - 1; i >= 0; i--) {
         grid[r][c] = colors[i];
         voff[r][c] = froms[i] - r; // <= 0（元の高い位置から落ちてくる）
+        vvel[r][c] = 0;
         r--;
       }
     }
@@ -196,6 +203,7 @@ window.createWidgetPuyo = function (ctx) {
   function reset() {
     grid = Puyo.emptyGrid();
     voff = makeVoff();
+    vvel = makeVoff();
     queue = [rndPair(), rndPair()];
     cur = null;
     over = false;
@@ -259,13 +267,16 @@ window.createWidgetPuyo = function (ctx) {
         break;
       }
       case 'settle': {
-        // 落下オフセットをゆっくり 0 へ（ぬるっと着地）
+        // スプリングで 0 へ（少しオーバーシュート＝スライムがぷるっと着地）
         let moving = false;
         for (let r = 0; r < H; r++) {
           for (let c = 0; c < W; c++) {
-            if (voff[r][c] < 0) {
-              voff[r][c] *= 0.55;
-              if (voff[r][c] > -0.04) voff[r][c] = 0; else moving = true;
+            if (voff[r][c] !== 0 || vvel[r][c] !== 0) {
+              vvel[r][c] += (-voff[r][c]) * 0.24;
+              vvel[r][c] *= 0.72;
+              voff[r][c] += vvel[r][c];
+              if (Math.abs(voff[r][c]) < 0.01 && Math.abs(vvel[r][c]) < 0.01) { voff[r][c] = 0; vvel[r][c] = 0; }
+              else moving = true;
             }
           }
         }
@@ -375,8 +386,11 @@ window.createWidgetPuyo = function (ctx) {
     for (let r = 1; r < H; r++) {
       for (let c = 0; c < W; c++) {
         if (grid[r][c] === 0 || popSet.has(`${r},${c}`)) continue;
-        // 落下オフセットを反映して「ぬるっと」描画
-        drawPuyoSprite(c * cell, (r - 1) * cell + voff[r][c] * cell, cell, grid[r][c]);
+        // 落下速度からスクワッシュ&ストレッチ（落下中は縦伸び、着地の跳ねで縦縮み）
+        const v = vvel[r][c] || 0;
+        const sys = 1 + Math.max(-0.32, Math.min(0.42, v * 0.6));
+        const sxs = 1 - Math.max(-0.32, Math.min(0.42, v * 0.6)) * 0.7;
+        drawPuyoSprite(c * cell, (r - 1) * cell + voff[r][c] * cell, cell, grid[r][c], 1, sxs, sys);
       }
     }
     // 消去エフェクト
