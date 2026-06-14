@@ -17,7 +17,7 @@
 
 type CKey = 'moss' | 'insect' | 'lizard' | 'element' | 'lilith' | 'dragon';
 interface CDef { name: string; chain: 'nut' | 'mag'; tier: number; hp: number; atk: number; color: string; r: number; speed: number; eats: CKey[]; pump?: boolean; fly?: boolean; ranged?: boolean; }
-interface Creature { type: CKey; x: number; y: number; tr: number; tc: number; hp: number; maxhp: number; atk: number; fed: number; carry: number; cd: number; flash: number; fly: boolean; dead?: boolean; }
+interface Creature { type: CKey; x: number; y: number; tr: number; tc: number; hp: number; maxhp: number; atk: number; fed: number; carry: number; stored: number; cd: number; flash: number; fly: boolean; dead?: boolean; }
 interface HDef { name: string; hp: number; atk: number; color: string; r: number; speed: number; mp: number; mage?: boolean; }
 interface Hero { x: number; y: number; tr: number; tc: number; cls: string; def: HDef; hp: number; maxhp: number; atk: number; speed: number; mp: number; cd: number; castcd: number; flash: number; carrying: boolean; dead?: boolean; }
 interface Particle { x: number; y: number; vx: number; vy: number; life: number; color: string; }
@@ -82,6 +82,11 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
   const dl = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
   const NB = [[-1, 0], [1, 0], [0, -1], [0, 1]];
   const NB8 = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [-1, 1], [1, -1], [1, 1]];
+  // 養分・魔分は「壁(土)」にのみ存在し、魔物・勇者は「通路」だけを通る
+  function wallNbrs(cell: number): number[] { const r = (cell / COLS) | 0, c = cell % COLS, out: number[] = []; for (const [dr, dc] of NB) { const nr = r + dr, nc = c + dc; if (inB(nr, nc) && cellType[idx(nr, nc)] === 0) out.push(idx(nr, nc)); } return out; }
+  function floorNbr(cell: number): number { const r = (cell / COLS) | 0, c = cell % COLS; const opts: number[] = []; for (const [dr, dc] of NB) { const nr = r + dr, nc = c + dc; if (inB(nr, nc) && cellType[idx(nr, nc)] !== 0) opts.push(idx(nr, nc)); } return opts.length ? opts[(Math.random() * opts.length) | 0] : -1; }
+  function randomWall(): number { for (let i = 0; i < 50; i++) { const k = ri(0, COLS * ROWS - 1); if (cellType[k] === 0) return k; } return -1; }
+  function richestWall(res: Float64Array): number { let bi = -1, bv = 0; for (let i = 0; i < res.length; i++) if (cellType[i] === 0 && res[i] > bv) { bv = res[i]; bi = i; } return bi; }
 
   // ---- ダンジョン生成 ----
   function buildDungeon() {
@@ -123,6 +128,10 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
         const d = dl(c, r, cc, cr); if (d > rad) continue;
         nutrient[idx(r, c)] += amt * Math.exp(-(d * d) / rad);
       }
+    }
+    // 養分は壁(土)にのみ宿る：通路に乗った分は隣接する壁へ移す（道に養分は無い）
+    for (let i = 0; i < cellType.length; i++) {
+      if (cellType[i] !== 0 && nutrient[i] > 0) { const w = wallNbrs(i); if (w.length) { const e = nutrient[i] / w.length; for (const k of w) nutrient[k] += e; } nutrient[i] = 0; }
     }
     recomputeFields();
   }
@@ -190,10 +199,11 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     return cap;                                                        // トカゲ＝主力（残り枠）
   }
   function creatureCap() { return Math.min(95, 42 + level * 3); }
-  function spawnCreature(type: CKey, cell: number) {
+  function spawnCreature(type: CKey, cell: number, cost = 0) {
     if (creatures.length >= creatureCap() || countType(type) >= typeCap(type)) return;
     const r = (cell / COLS) | 0, c = cell % COLS, def = C[type], hpScale = 1 + level * 0.05;
-    creatures.push({ type, x: c + 0.5, y: r + 0.5, tr: r, tc: c, hp: def.hp * hpScale, maxhp: def.hp * hpScale, atk: def.atk, fed: 0, carry: 0, cd: 0, flash: 0, fly: !!def.fly });
+    // cost = 土から消費して湧いた資源量。死亡時にそのまま壁へ還す（保存則）
+    creatures.push({ type, x: c + 0.5, y: r + 0.5, tr: r, tc: c, hp: def.hp * hpScale, maxhp: def.hp * hpScale, atk: def.atk, fed: 0, carry: 0, stored: cost, cd: 0, flash: 0, fly: !!def.fly });
   }
   function spawnHero(cls: string) {
     const def = H[cls], hpScale = 1 + level * 0.3, atkScale = 1 + level * 0.15;
@@ -203,27 +213,35 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
   function burst(x: number, y: number, color: string, n = 7) { for (let i = 0; i < n; i++) { const a = rnd(0, Math.PI * 2), s = rnd(1.5, 4.5); particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.3, 0.6), color }); } }
   function floatText(x: number, y: number, text: string, color: string) { floats.push({ x, y, life: 0.95, text, color }); }
 
-  // 保存則：死亡時、保有資源を周囲の通路へ飛散
+  // 保存則：死亡時、保有資源を周囲の「壁(土)」へ飛散（道には残らない）
   function scatter(cell: number, res: Float64Array, amt: number) {
     if (amt <= 0) return;
     const r = (cell / COLS) | 0, c = cell % COLS;
     const tgts: number[] = [];
-    for (const [dr, dc] of NB8) { const nr = r + dr, nc = c + dc; if (inB(nr, nc) && cellType[idx(nr, nc)] !== 0) tgts.push(idx(nr, nc)); }
-    if (cellType[cell] !== 0) tgts.push(cell);
-    if (tgts.length === 0) return;
+    for (const [dr, dc] of NB8) { const nr = r + dr, nc = c + dc; if (inB(nr, nc) && cellType[idx(nr, nc)] === 0) tgts.push(idx(nr, nc)); }
+    if (tgts.length === 0) return;          // 壁が無ければ霧散（簡略）
     const each = amt / tgts.length;
-    for (const t of tgts) res[t] = Math.min(48, res[t] + each);   // 1 セルに溜め込みすぎない
+    for (const t of tgts) res[t] = Math.min(48, res[t] + each);   // 1 マスに溜め込みすぎない
   }
 
-  // ---- 破壊神 AI：掘って袋小路を作り、運搬役で濃縮 → 上位種を育てる（ドラゴンを目指す）----
+  // ---- 破壊神 AI：鉱脈は掘らず“その隣”を掘って露出させる（養分を保ったまま湧かせる定石）----
   function aiDig() {
     if (digPower < 1) return;
+    if (path.length > COLS * ROWS * 0.46) return;   // 掘りすぎない（土＝養分の貯蔵を残す）
     const frontier: number[] = [];
     for (const p of path) for (const [dr, dc] of NB) { const r = p.r + dr, c = p.c + dc; if (inB(r, c) && cellType[idx(r, c)] === 0) frontier.push(idx(r, c)); }
     if (frontier.length === 0) return;
-    // 養分の濃い土を優先して掘り、通路へ解放（＝採掘）
-    let cell = frontier[(Math.random() * frontier.length) | 0];
-    if (Math.random() < 0.7) { let bn = -1; for (let i = 0; i < 16; i++) { const f = frontier[(Math.random() * frontier.length) | 0]; if (nutrient[f] > bn) { bn = nutrient[f]; cell = f; } } }
+    // 「養分の薄い土」かつ「隣に濃い鉱脈がある」マスを優先 → 鉱脈を温存しつつ通路へ露出
+    let cell = frontier[(Math.random() * frontier.length) | 0], bs = -Infinity;
+    for (let i = 0; i < 20; i++) {
+      const f = frontier[(Math.random() * frontier.length) | 0];
+      let mx = 0; for (const wn of wallNbrs(f)) if (nutrient[wn] > mx) mx = nutrient[wn];
+      const score = mx - nutrient[f] * 2 + Math.random() * 2;
+      if (score > bs) { bs = score; cell = f; }
+    }
+    // 掘る壁の(僅かな)資源は隣接する壁へ逃がす（道に養分は残さない）
+    if (nutrient[cell] > 0) { scatter(cell, nutrient, nutrient[cell]); nutrient[cell] = 0; }
+    if (magic[cell] > 0) { scatter(cell, magic, magic[cell]); magic[cell] = 0; }
     cellType[cell] = 1; path.push({ r: (cell / COLS) | 0, c: cell % COLS });
     digPower -= 1;
     const r = (cell / COLS) | 0, c = cell % COLS;
@@ -236,31 +254,26 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     if (countType('moss') < 3 && digPower >= 2) { digPower -= 2; spawnCreature('moss', randomTunnel()); }
     // 魔分が溜まっていてエレメントが居なければ湧かせる（魔力系の起点）
     let totalMag = 0; for (let i = 0; i < magic.length; i++) totalMag += magic[i];
-    if (totalMag > 4 && countType('element') < 3 && digPower >= 2) { digPower -= 2; spawnCreature('element', richestCell(magic)); }
+    if (totalMag > 4 && countType('element') < 3 && digPower >= 2) { const w = richestWall(magic); const t = w >= 0 ? floorNbr(w) : randomTunnel(); if (t >= 0) { digPower -= 2; spawnCreature('element', t); } }
     // 脅威に応じて迎撃役（トカゲ）を道沿いに補充
     let fighters = 0; for (const c of creatures) if (!c.dead && c.type !== 'moss' && c.type !== 'element') fighters++;
     const target = Math.min(creatureCap() - 4, 8 + level * 2);
     if (fighters < target && digPower >= 4) { digPower -= 4; const p = path[(Math.random() * path.length) | 0]; spawnCreature(level >= 4 && Math.random() < 0.5 ? 'lizard' : 'insect', idx(p.r, p.c)); }
   }
-  function richestCell(res: Float64Array): number { let bi = idx(overlord.r, overlord.c), bv = -1; for (let i = 0; i < res.length; i++) if (cellType[i] !== 0 && res[i] > bv) { bv = res[i]; bi = i; } return bi; }
 
-  // 濃縮した土から上位種が湧く（定石の自動化）
+  // 濃縮した「壁(土)」から、面した通路へ上位種が湧く（定石の自動化）
   function densitySpawn() {
     // 魔分は揮発性：余剰はゆっくり散逸（溜め込み暴走を防ぐ。養分は保存）
-    for (let i = 0; i < magic.length; i++) if (magic[i] > 0) magic[i] *= 0.996;
-    // 最も濃い土を確定でチェック（濃縮した一点から頂点種が湧く＝定石）
-    upTier(richestCell(nutrient), nutrient, 'lizard', 'insect', NUT_T.lizard, NUT_T.insect);
-    upTier(richestCell(magic), magic, 'dragon', 'lilith', MAG_T.dragon, MAG_T.lilith);
-    // ランダムにも散発チェック
-    for (let k = 0; k < 8; k++) {
-      const cell = randomTunnel();
-      upTier(cell, nutrient, 'lizard', 'insect', NUT_T.lizard, NUT_T.insect);
-      upTier(cell, magic, 'dragon', 'lilith', MAG_T.dragon, MAG_T.lilith);
-    }
+    for (let i = 0; i < magic.length; i++) if (cellType[i] === 0 && magic[i] > 0) magic[i] *= 0.996;
+    upTier(richestWall(nutrient), nutrient, 'lizard', 'insect', NUT_T.lizard, NUT_T.insect);
+    upTier(richestWall(magic), magic, 'dragon', 'lilith', MAG_T.dragon, MAG_T.lilith);
+    for (let k = 0; k < 8; k++) { const w = randomWall(); upTier(w, nutrient, 'lizard', 'insect', NUT_T.lizard, NUT_T.insect); upTier(w, magic, 'dragon', 'lilith', MAG_T.dragon, MAG_T.lilith); }
   }
-  function upTier(cell: number, res: Float64Array, hi: CKey, lo: CKey, hiT: number, loT: number) {
-    if (res[cell] >= hiT && countType(hi) < typeCap(hi)) { spawnCreature(hi, cell); res[cell] -= hiT; if (hi === 'dragon') floatText(cell % COLS + 0.5, (cell / COLS | 0) + 0.5, 'ドラゴン誕生!', '#e05a7a'); }
-    else if (res[cell] >= loT && countType(lo) < typeCap(lo)) { spawnCreature(lo, cell); res[cell] -= loT * 0.6; }
+  function upTier(wcell: number, res: Float64Array, hi: CKey, lo: CKey, hiT: number, loT: number) {
+    if (wcell < 0 || cellType[wcell] !== 0) return;
+    const t = floorNbr(wcell); if (t < 0) return;          // 通路に面した壁からのみ湧く
+    if (res[wcell] >= hiT && countType(hi) < typeCap(hi)) { spawnCreature(hi, t, hiT); res[wcell] -= hiT; if (hi === 'dragon') floatText((t % COLS) + 0.5, ((t / COLS) | 0) + 0.5, 'ドラゴン誕生!', '#e05a7a'); }
+    else if (res[wcell] >= loT && countType(lo) < typeCap(lo)) { const cost = loT * 0.6; spawnCreature(lo, t, cost); res[wcell] -= cost; }
   }
 
   // ---- 移動 ----
@@ -271,7 +284,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
   }
   function curCell(e: { x: number; y: number }) { return { r: Math.max(0, Math.min(ROWS - 1, Math.floor(e.y))), c: Math.max(0, Math.min(COLS - 1, Math.floor(e.x))) }; }
   function atCenter(e: { x: number; y: number }, tr: number, tc: number) { return Math.abs(e.x - (tc + 0.5)) < 0.06 && Math.abs(e.y - (tr + 0.5)) < 0.06; }
-  const passable = (cr: Creature, r: number, c: number) => inB(r, c) && (cr.fly || cellType[idx(r, c)] !== 0);
+  const passable = (_cr: Creature, r: number, c: number) => inB(r, c) && cellType[idx(r, c)] !== 0; // 魔物も勇者も通路のみ
   function gradientNext(e: { x: number; y: number }, field: Int32Array) {
     const { r, c } = curCell(e);
     let bv = field[idx(r, c)] < 0 ? Infinity : field[idx(r, c)], br = r, bc = c;
@@ -314,7 +327,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
       if (h.carrying) { overlord.x = h.x; overlord.y = h.y - 0.2; }
       if (h.carrying && cc.r === entranceR && cc.c === entranceC) { gameOver(); return; }
       // 魔法使い等は詠唱して魔分を撒く（運搬中も逃げず戦う＝近接交戦は継続）
-      if (h.def.mage && h.mp > 0) { h.castcd -= dt; if (h.castcd <= 0) { h.castcd = rnd(1.6, 2.8); const spend = Math.min(h.mp, 6); h.mp -= spend; magic[idx(cc.r, cc.c)] += spend; floatText(h.x, h.y, '魔法', '#9aa6f4'); // 周囲のモンスターへダメージ
+      if (h.def.mage && h.mp > 0) { h.castcd -= dt; if (h.castcd <= 0) { h.castcd = rnd(1.6, 2.8); const spend = Math.min(h.mp, 6); h.mp -= spend; const mw = wallNbrs(idx(cc.r, cc.c)); if (mw.length) magic[mw[(Math.random() * mw.length) | 0]] = Math.min(48, magic[mw[(Math.random() * mw.length) | 0]] + spend); floatText(h.x, h.y, '魔法', '#9aa6f4'); // 周囲のモンスターへダメージ
         for (const cr of creatures) if (!cr.dead && dl(h.x, h.y, cr.x, cr.y) < 2.4) damageCreature(cr, h.atk * 0.8); } }
       // 隣接モンスターと交戦
       let foe: Creature | null = null, fd = 0.95;
@@ -331,16 +344,22 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
       const cc = curCell(cr), ci = idx(cc.r, cc.c), def = C[cr.type];
 
       if (def.pump) {
-        // 運搬役：今いる土から資源を吸い、運んで“濃い土へ集める”＝濃縮
+        // 運搬役：隣接する「壁(土)」の薄い方から資源を吸い、運んでいる分を濃い壁へ吐き出す＝濃縮
         const res = cr.type === 'moss' ? nutrient : magic;
-        const a = Math.min(res[ci], 5 * dt); res[ci] -= a; cr.carry += a;
-        pumpMove(cr, dt, res);
+        const walls = wallNbrs(ci);
+        if (walls.length) {
+          let hi = walls[0], lo = walls[0];
+          for (const w of walls) { if (res[w] > res[hi]) hi = w; if (res[w] < res[lo]) lo = w; }
+          if (cr.carry > 0) { const d = Math.min(cr.carry, 6 * dt + 0.04); res[hi] = Math.min(48, res[hi] + d); cr.carry -= d; }
+          const a = Math.min(res[lo], 5 * dt); res[lo] -= a; cr.carry += a;
+        }
+        pumpMove(cr, dt);
       } else {
         // 捕食：隣接する獲物を食う（獲物の保有資源は飛散＝循環）
         if (def.eats.length) {
           for (const other of creatures) {
             if (other.dead || other === cr || def.eats.indexOf(other.type) < 0) continue;
-            if (dl(cr.x, cr.y, other.x, other.y) < 0.7) { other.dead = true; cr.fed += 9; cr.hp = Math.min(cr.maxhp, cr.hp + cr.maxhp * 0.12); const oc = curCell(other); scatter(idx(oc.r, oc.c), C[other.type].chain === 'mag' ? magic : nutrient, 3); burst(other.x, other.y, C[other.type].color, 5); break; }
+            if (dl(cr.x, cr.y, other.x, other.y) < 0.7) { other.dead = true; cr.fed += 9; cr.hp = Math.min(cr.maxhp, cr.hp + cr.maxhp * 0.12); const oc = curCell(other); scatter(idx(oc.r, oc.c), C[other.type].chain === 'mag' ? magic : nutrient, other.stored + other.carry); burst(other.x, other.y, C[other.type].color, 5); break; }
           }
         }
         combatMove(cr, dt, def);
@@ -348,18 +367,12 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     }
   }
 
-  // 運搬役の移動：視界内で最も資源の濃い通路セルへ向かい、着いたら吐き出す（濃縮）
-  function pumpMove(cr: Creature, dt: number, res: Float64Array) {
-    const cc = curCell(cr), ci = idx(cc.r, cc.c);
+  // 運搬役の移動：通路を徘徊して各所の壁を巡り、資源を運んで回る
+  function pumpMove(cr: Creature, dt: number) {
+    const cc = curCell(cr);
     if (atCenter(cr, cr.tr, cr.tc)) {
-      // 局所最大なら吐き出して少し徘徊、そうでなければ濃い方へ
-      let bv = res[ci], br = cc.r, bc = cc.c;
-      for (let dr = -3; dr <= 3; dr++) for (let dc = -3; dc <= 3; dc++) { const nr = cc.r + dr, nc = cc.c + dc; if (!passable(cr, nr, nc)) continue; if (res[idx(nr, nc)] > bv) { bv = res[idx(nr, nc)]; br = nr; bc = nc; } }
-      if (br === cc.r && bc === cc.c) { res[ci] += cr.carry; cr.carry = 0; // 集約
-        const opts = NB.map(([dr, dc]) => [cc.r + dr, cc.c + dc]).filter(([r, c]) => passable(cr, r, c)); if (opts.length) { const o = opts[(Math.random() * opts.length) | 0]; cr.tr = o[0]; cr.tc = o[1]; } }
-      else { // 濃い方へ一歩
-        let nr = cc.r, nc = cc.c, bb = -1; for (const [dr, dc] of NB) { const r = cc.r + dr, c = cc.c + dc; if (!passable(cr, r, c)) continue; const v = res[idx(r, c)] + (dl(c, r, bc, br) < dl(cc.c, cc.r, bc, br) ? 100 : 0); if (v > bb) { bb = v; nr = r; nc = c; } } cr.tr = nr; cr.tc = nc;
-      }
+      const opts = NB.map(([dr, dc]) => [cc.r + dr, cc.c + dc]).filter(([r, c]) => passable(cr, r, c));
+      if (opts.length) { const o = opts[(Math.random() * opts.length) | 0]; cr.tr = o[0]; cr.tc = o[1]; }
     }
     stepToward(cr, cr.tr, cr.tc, dt, C[cr.type].speed);
   }
@@ -386,16 +399,17 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
 
   function damageCreature(cr: Creature, dmg: number) {
     cr.hp -= dmg; cr.flash = 0.18;
-    if (cr.hp <= 0 && !cr.dead) { cr.dead = true; const cc = curCell(cr); scatter(idx(cc.r, cc.c), C[cr.type].chain === 'mag' ? magic : nutrient, 2 + cr.carry); burst(cr.x, cr.y, C[cr.type].color, 8); if (window.SFX) window.SFX.pop && window.SFX.pop(); }
+    if (cr.hp <= 0 && !cr.dead) { cr.dead = true; const cc = curCell(cr); scatter(idx(cc.r, cc.c), C[cr.type].chain === 'mag' ? magic : nutrient, cr.stored + cr.carry); burst(cr.x, cr.y, C[cr.type].color, 8); if (window.SFX) window.SFX.pop && window.SFX.pop(); }
   }
   function damageHero(h: Hero, dmg: number) {
     h.hp -= dmg; h.flash = 0.18;
     if (h.hp <= 0 && !h.dead) {
       h.dead = true; const cc = curCell(h), dcell = idx(cc.r, cc.c);
-      // しかばね：養分は周囲へ飛散、魔分（残 MP の半分・最大30＋基本値）は死体セルに集中
-      // （エレメントが運び濃縮 → 魔力系の食物連鎖が育つ。本家の「しかばねの魔分」）
+      // しかばね：養分は周囲の壁へ飛散、魔分（残 MP の半分・最大30＋基本値）は隣接する一番濃い壁に集中
+      // （壁に染み込み、エレメントが運び濃縮 → 魔力系の食物連鎖が育つ。本家の「しかばねの魔分」）
       scatter(dcell, nutrient, 10 + level * 0.6);
-      magic[dcell] = Math.min(48, magic[dcell] + Math.min(30, h.mp * 0.5) + 7);
+      const dw = wallNbrs(dcell);
+      if (dw.length) { let hi = dw[0]; for (const w of dw) if (magic[w] > magic[hi]) hi = w; magic[hi] = Math.min(48, magic[hi] + Math.min(30, h.mp * 0.5) + 7); }
       burst(h.x, h.y, h.def.color, 12); floatText(h.x, h.y, '撃退!', '#ffd24a');
       if (window.SFX) window.SFX.explode && window.SFX.explode();
       if (h.carrying) { overlord.state = 'dropped'; overlord.dropT = 2.0; overlord.carrier = null; floatText(h.x, h.y, '魔王 奪還', '#c050ff'); }
@@ -440,16 +454,23 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     bg.addColorStop(0, '#2a2030'); bg.addColorStop(1, '#140e1a');
     g2d.fillStyle = bg; g2d.fillRect(offX, offY, COLS * scale, ROWS * scale);
 
+    // 掘った通路の床（暗い）を一面に敷く
+    g2d.fillStyle = '#181018'; g2d.fillRect(offX, offY, COLS * scale, ROWS * scale);
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-      const t = cellType[idx(r, c)], x = sx(c), y = sy(r), nut = nutrient[idx(r, c)], mag = magic[idx(r, c)];
+      const t = cellType[idx(r, c)], x = sx(c), y = sy(r);
       if (t === 0) {
-        const h = ((r * 73 + c * 19) % 7) - 3; g2d.fillStyle = `rgb(${66 + h},${52 + h},${44 + h})`; g2d.fillRect(x, y, scale + 0.5, scale + 0.5);
-        if (nut > 1) { g2d.save(); g2d.globalAlpha = Math.min(0.5, nut / 40); g2d.fillStyle = '#6fd05a'; g2d.fillRect(x, y, scale, scale); g2d.restore(); }
-        g2d.fillStyle = 'rgba(0,0,0,0.18)'; g2d.fillRect(x, y + scale * 0.74, scale + 0.5, scale * 0.26);
-      } else {
-        g2d.fillStyle = '#221a28'; g2d.fillRect(x, y, scale + 0.5, scale + 0.5);
-        if (nut > 0.5) { g2d.save(); g2d.globalAlpha = Math.min(0.5, nut / 20); g2d.fillStyle = '#7fe05a'; g2d.fillRect(x, y, scale, scale); g2d.restore(); }
-        if (mag > 0.3) { g2d.save(); g2d.globalAlpha = Math.min(0.6, mag / 16); g2d.fillStyle = '#b06fe0'; g2d.fillRect(x, y, scale, scale); g2d.restore(); }
+        // 壁＝土ブロック（養分=緑／魔分=紫の染み）。資源は壁にのみ宿る
+        const nut = nutrient[idx(r, c)], mag = magic[idx(r, c)];
+        const sh = ((r * 73 + c * 19) % 6) - 2;
+        let rr = 70 + sh, gg = 56 + sh, bb = 46 + sh;
+        if (nut > 1) { const a = Math.min(0.85, nut / 26); rr = rr * (1 - a) + 110 * a; gg = gg * (1 - a) + 196 * a; bb = bb * (1 - a) + 90 * a; }
+        if (mag > 0.5) { const a = Math.min(0.85, mag / 22); rr = rr * (1 - a) + 176 * a; gg = gg * (1 - a) + 111 * a; bb = bb * (1 - a) + 224 * a; }
+        g2d.fillStyle = `rgb(${rr | 0},${gg | 0},${bb | 0})`;
+        g2d.fillRect(x + 0.5, y + 0.5, scale - 1, scale - 1);              // ブロック間に溝（グラウト）
+        g2d.fillStyle = 'rgba(255,255,255,0.10)'; g2d.fillRect(x + 0.5, y + 0.5, scale - 1, scale * 0.18); // 上面ハイライト
+        g2d.fillStyle = 'rgba(0,0,0,0.22)'; g2d.fillRect(x + 0.5, y + scale * 0.78, scale - 1, scale * 0.2); // 下影
+      } else if (t === 2) {
+        g2d.fillStyle = '#241430'; g2d.fillRect(x, y, scale + 0.5, scale + 0.5);
       }
     }
     g2d.fillStyle = '#f0d060'; g2d.fillRect(sx(entranceC) + scale * 0.2, sy(entranceR) + scale * 0.02, scale * 0.6, scale * 0.22);
