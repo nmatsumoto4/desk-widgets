@@ -16,7 +16,7 @@
 //  ・負け＝ヒーローが魔王を掴んで入口へ運び出す（運搬中も逃げず戦う＝道中で討てば救出）。
 
 type CKey = 'moss' | 'insect' | 'lizard' | 'element' | 'lilith' | 'dragon';
-interface CDef { name: string; chain: 'nut' | 'mag'; tier: number; hp: number; atk: number; color: string; r: number; speed: number; eats: CKey[]; pump?: boolean; fly?: boolean; ranged?: boolean; }
+interface CDef { name: string; chain: 'nut' | 'mag'; tier: number; hp: number; atk: number; color: string; r: number; speed: number; eats: CKey[]; pump?: boolean; fly?: boolean; ranged?: boolean; fire?: boolean; }
 interface Creature { type: CKey; x: number; y: number; tr: number; tc: number; hp: number; maxhp: number; atk: number; fed: number; carry: number; stored: number; cd: number; flash: number; fly: boolean; dead?: boolean; }
 interface HDef { name: string; hp: number; atk: number; color: string; r: number; speed: number; mp: number; mage?: boolean; }
 interface Hero { x: number; y: number; tr: number; tc: number; cls: string; def: HDef; hp: number; maxhp: number; atk: number; speed: number; mp: number; cd: number; castcd: number; flash: number; carrying: boolean; dead?: boolean; }
@@ -35,12 +35,13 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
 
   // 生態系（2 系統）。pump=運搬役（資源を吸って濃縮）
   const C: Record<CKey, CDef> = {
+    // モンスターは“仲間は攻撃せず”勇者だけを迎撃する（捕食は廃止）。種類は土の濃さで湧く
     moss:    { name: 'ニジリゴケ',   chain: 'nut', tier: 1, hp: 14,  atk: 2,  color: '#7fd05a', r: 0.24, speed: 1.0, eats: [], pump: true },
-    insect:  { name: 'ガジガジムシ', chain: 'nut', tier: 2, hp: 26,  atk: 9,  color: '#d8c24a', r: 0.30, speed: 1.6, eats: ['moss'] },
-    lizard:  { name: 'トカゲおとこ', chain: 'nut', tier: 3, hp: 72,  atk: 20, color: '#5fa86a', r: 0.40, speed: 1.25, eats: ['insect'] },
+    insect:  { name: 'ガジガジムシ', chain: 'nut', tier: 2, hp: 26,  atk: 9,  color: '#d8c24a', r: 0.30, speed: 1.6, eats: [] },
+    lizard:  { name: 'トカゲおとこ', chain: 'nut', tier: 3, hp: 72,  atk: 20, color: '#5fa86a', r: 0.40, speed: 1.25, eats: [] },
     element: { name: 'エレメント',   chain: 'mag', tier: 1, hp: 16,  atk: 5,  color: '#6fd6ea', r: 0.26, speed: 1.5, eats: [], pump: true, fly: true },
-    lilith:  { name: 'リリス',       chain: 'mag', tier: 2, hp: 40,  atk: 16, color: '#c87fe0', r: 0.32, speed: 1.5, eats: ['insect', 'moss'], fly: true, ranged: true },
-    dragon:  { name: 'ドラゴン',     chain: 'mag', tier: 3, hp: 170, atk: 38, color: '#e05a7a', r: 0.55, speed: 1.7, eats: ['moss', 'insect', 'lizard', 'element', 'lilith'], fly: true },
+    lilith:  { name: 'リリス',       chain: 'mag', tier: 2, hp: 40,  atk: 16, color: '#c87fe0', r: 0.32, speed: 1.5, eats: [], fly: true, ranged: true },
+    dragon:  { name: 'ドラゴン',     chain: 'mag', tier: 3, hp: 190, atk: 30, color: '#e05a7a', r: 0.55, speed: 1.7, eats: [], fly: true, ranged: true, fire: true }, // 火を吹く（範囲）
   };
   // 土の資源濃度で湧く閾値（濃縮するほど上位種）
   const NUT_T = { insect: 9, lizard: 22 };
@@ -146,7 +147,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
   function recomputeFields() { bfsField(distCore, idx(overlord.r, overlord.c)); bfsField(distEntr, idx(entranceR, entranceC)); }
 
   function newGame() {
-    creatures = []; heroes = []; particles = []; floats = []; beams = [];
+    creatures = []; heroes = []; particles = []; floats = []; beams = []; fires = [];
     digPower = 50; level = 0;
     state = 'play'; restartCountdown = -1; waveGap = 0;
     ctx.hideOverlay();
@@ -198,7 +199,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     if (t === 'dragon') return Math.min(6, 1 + Math.floor(level / 5)); // 希少な頂点捕食者
     return cap;                                                        // トカゲ＝主力（残り枠）
   }
-  function creatureCap() { return Math.min(95, 42 + level * 3); }
+  function creatureCap() { return Math.min(76, 34 + level * 2.2) | 0; }
   function spawnCreature(type: CKey, cell: number, cost = 0) {
     if (creatures.length >= creatureCap() || countType(type) >= typeCap(type)) return;
     const r = (cell / COLS) | 0, c = cell % COLS, def = C[type], hpScale = 1 + level * 0.05;
@@ -206,7 +207,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     creatures.push({ type, x: c + 0.5, y: r + 0.5, tr: r, tc: c, hp: def.hp * hpScale, maxhp: def.hp * hpScale, atk: def.atk, fed: 0, carry: 0, stored: cost, cd: 0, flash: 0, fly: !!def.fly });
   }
   function spawnHero(cls: string) {
-    const def = H[cls], hpScale = 1 + level * 0.3, atkScale = 1 + level * 0.15;
+    const def = H[cls], hpScale = 1 + level * 0.34, atkScale = 1 + level * 0.19;
     heroes.push({ x: entranceC + 0.5, y: entranceR + 0.5, tr: entranceR, tc: entranceC, cls, def, hp: def.hp * hpScale, maxhp: def.hp * hpScale, atk: def.atk * atkScale, speed: def.speed, mp: def.mp, cd: 0, castcd: rnd(1, 3), flash: 0, carrying: false });
   }
 
@@ -311,7 +312,13 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     if (overlord.state === 'dropped') { overlord.dropT -= dt; if (overlord.dropT <= 0) { overlord.state = 'nest'; overlord.x = overlord.c + 0.5; overlord.y = overlord.r + 0.5; burst(overlord.x, overlord.y, '#c050ff', 12); } }
 
     digCd -= dt;
-    if (digCd <= 0) { digCd = 0.26; aiDig(); aiManage(); }
+    if (digCd <= 0) {
+      digCd = 0.3;
+      // 掘るかどうかのジレンマ：侵入中に掘ると道が増え勇者の探索・範囲攻撃が有利になる。
+      // 平時（ウェーブ間）にだけ掘って配下を育て、勇者が来たら掘らずに待つ（つるはしを休める）。
+      if (heroes.length === 0 && toSpawn.length === 0) aiDig();
+      aiManage();   // 運搬役の維持・戦力補充は常時
+    }
     ecoCd -= dt;
     if (ecoCd <= 0) { ecoCd = 0.4; densitySpawn(); }
 
@@ -355,14 +362,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
         }
         pumpMove(cr, dt);
       } else {
-        // 捕食：隣接する獲物を食う（獲物の保有資源は飛散＝循環）
-        if (def.eats.length) {
-          for (const other of creatures) {
-            if (other.dead || other === cr || def.eats.indexOf(other.type) < 0) continue;
-            if (dl(cr.x, cr.y, other.x, other.y) < 0.7) { other.dead = true; cr.fed += 9; cr.hp = Math.min(cr.maxhp, cr.hp + cr.maxhp * 0.12); const oc = curCell(other); scatter(idx(oc.r, oc.c), C[other.type].chain === 'mag' ? magic : nutrient, other.stored + other.carry); burst(other.x, other.y, C[other.type].color, 5); break; }
-          }
-        }
-        combatMove(cr, dt, def);
+        combatMove(cr, dt, def);   // 戦闘員：勇者だけを迎撃（仲間は襲わない）
       }
     }
   }
@@ -377,17 +377,18 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     stepToward(cr, cr.tr, cr.tc, dt, C[cr.type].speed);
   }
 
-  // 戦闘員の移動：近くのヒーロー優先で持ち場を守り、なければ獲物・徘徊
+  // 戦闘員の移動：近くのヒーローだけを狙って迎撃。ドラゴンは火を吹く（範囲）
   function combatMove(cr: Creature, dt: number, def: CDef) {
-    if (cr.type !== 'moss') {
-      const range = def.ranged ? 2.6 : 0.95;
-      let target: Hero | null = null, td = range;
-      for (const h of heroes) { if (h.dead) continue; const d = dl(cr.x, cr.y, h.x, h.y); if (d < td) { td = d; target = h; } }
-      if (target) { cr.cd -= dt; if (cr.cd <= 0) { cr.cd = def.ranged ? 0.7 : 0.5; damageHero(target, cr.atk); cr.flash = 0.15; if (def.ranged) beam(cr, target); } if (def.ranged) return; }
+    const range = def.fire ? 3.4 : def.ranged ? 2.6 : 0.95;
+    let target: Hero | null = null, td = range;
+    for (const h of heroes) { if (h.dead) continue; const d = dl(cr.x, cr.y, h.x, h.y); if (d < td) { td = d; target = h; } }
+    if (target) {
+      cr.cd -= dt;
+      if (cr.cd <= 0) { cr.cd = def.fire ? 1.1 : def.ranged ? 0.7 : 0.5; cr.flash = 0.15; if (def.fire) fireBreath(cr, target); else { damageHero(target, cr.atk); if (def.ranged) beam(cr, target); } }
+      if (def.ranged || def.fire) return;   // 遠距離・火噴きは近づかずその場で撃つ
     }
     let tx = -1, ty = -1;
-    if (cr.type !== 'moss') { let best = 3.6, h: Hero | null = null; for (const hh of heroes) { if (hh.dead) continue; const d = dl(cr.x, cr.y, hh.x, hh.y); if (d < best) { best = d; h = hh; } } if (h) { tx = h.x; ty = h.y; } }
-    if (tx < 0 && def.eats.length) { let best = 4.5, p: Creature | null = null; for (const o of creatures) { if (o.dead || def.eats.indexOf(o.type) < 0) continue; const d = dl(cr.x, cr.y, o.x, o.y); if (d < best) { best = d; p = o; } } if (p) { tx = p.x; ty = p.y; } }
+    { let best = 3.6, h: Hero | null = null; for (const hh of heroes) { if (hh.dead) continue; const d = dl(cr.x, cr.y, hh.x, hh.y); if (d < best) { best = d; h = hh; } } if (h) { tx = h.x; ty = h.y; } }
     const cc = curCell(cr);
     if (atCenter(cr, cr.tr, cr.tc)) {
       let br = cc.r, bc = cc.c, bv = Infinity;
@@ -419,10 +420,21 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
 
   function beam(cr: Creature, h: Hero) { beams.push({ x1: cr.x, y1: cr.y, x2: h.x, y2: h.y, life: 0.12, color: C[cr.type].color }); }
 
+  // ドラゴンの火炎：対象を中心に範囲ダメージ＋炎の演出
+  function fireBreath(cr: Creature, target: Hero) {
+    const ang = Math.atan2(target.y - cr.y, target.x - cr.x);
+    for (const h of heroes) { if (h.dead) continue; const d = dl(target.x, target.y, h.x, h.y); if (d < 1.7) { damageHero(h, cr.atk * (h === target ? 1 : 0.6)); h.flash = 0.2; } }
+    fires.push({ x: cr.x, y: cr.y, ang, life: 0.3 });
+    for (let i = 0; i < 10; i++) { const a = ang + rnd(-0.4, 0.4), s = rnd(3, 7); particles.push({ x: cr.x + Math.cos(ang) * 0.5, y: cr.y + Math.sin(ang) * 0.5, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.2, 0.5), color: i % 2 ? '#ff9a30' : '#ffd24a' }); }
+    if (window.SFX) window.SFX.explode && window.SFX.explode();
+  }
+  let fires: { x: number; y: number; ang: number; life: number }[] = [];
+
   function decayFx(dt: number) {
     for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } particles = particles.filter((p) => p.life > 0);
     for (const f of floats) { f.y -= dt * 1.2; f.life -= dt; } floats = floats.filter((f) => f.life > 0);
     for (const b of beams) b.life -= dt; beams = beams.filter((b) => b.life > 0);
+    for (const fr of fires) fr.life -= dt; fires = fires.filter((fr) => fr.life > 0);
   }
 
   function gameOver() { state = 'gameover'; restartCountdown = RESTART_TICKS; if (window.SFX) window.SFX.die && window.SFX.die(); ctx.showOverlay('魔王 連れ去られ…', auto ? `Wave ${level} ・自動リスタート…` : `Wave ${level} ・キーで再開`); }
@@ -477,6 +489,8 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
 
     if (overlord.state !== 'carried') drawOverlord(overlord.x, overlord.y);
     for (const b of beams) { g2d.save(); g2d.shadowColor = b.color; g2d.shadowBlur = scale; g2d.strokeStyle = b.color; g2d.lineWidth = scale * 0.12; g2d.globalAlpha = Math.min(1, b.life * 9); g2d.beginPath(); g2d.moveTo(sx(b.x1), sy(b.y1)); g2d.lineTo(sx(b.x2), sy(b.y2)); g2d.stroke(); g2d.restore(); }
+    // ドラゴンの火炎
+    for (const fr of fires) { const a = Math.max(0, fr.life / 0.3), len = scale * 2.6 * (1.2 - a * 0.4); g2d.save(); g2d.globalAlpha = a; g2d.shadowColor = '#ff7a2a'; g2d.shadowBlur = scale; g2d.translate(sx(fr.x), sy(fr.y)); g2d.rotate(fr.ang); g2d.fillStyle = '#ffd24a'; g2d.beginPath(); g2d.moveTo(0, 0); g2d.lineTo(len, -scale * 0.8); g2d.lineTo(len, scale * 0.8); g2d.closePath(); g2d.fill(); g2d.fillStyle = '#ff7a2a'; g2d.beginPath(); g2d.moveTo(0, 0); g2d.lineTo(len * 0.66, -scale * 0.42); g2d.lineTo(len * 0.66, scale * 0.42); g2d.closePath(); g2d.fill(); g2d.restore(); }
     g2d.globalAlpha = 1;
     for (const cr of creatures) drawCreature(cr);
     for (const h of heroes) drawHero(h);
@@ -499,21 +513,34 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     g2d.fillStyle = '#2a0f2a'; g2d.fillRect(cx - rad * 0.4, cy - rad * 0.1, rad * 0.3, rad * 0.34); g2d.fillRect(cx + rad * 0.12, cy - rad * 0.1, rad * 0.3, rad * 0.34);
   }
 
+  // ドット絵スプライト（'.'=透明 o=輪郭 b=体色 d=陰 e=目 h=光 s=剣 g=盾 w=翼）
+  const SPR: Record<CKey, string[]> = {
+    moss: ['..ooo..', '.obbbo.', 'obbbbbo', 'obebebo', 'obbbbbo', '.odddo.', '..ooo..'],
+    insect: ['o.....o', '.o...o.', '.obbbo.', 'obebebo', 'obbbbbo', '.odbdo.', 'o.o.o.o'],
+    lizard: ['b.b...s', 'obbbo.s', 'obebbos', 'gbbbbbo', 'gobbbdo', '.obbbo.', '..o.o..'],
+    element: ['...o...', '..obo..', '.obhbo.', 'obbhbbo', '.obbbo.', '..obo..', '...o...'],
+    lilith: ['b.....b', 'woo.oow', 'wobebow', 'wobbbow', '.obbbo.', '..ooo..', '...o...'],
+    dragon: ['b.......b', '.oo...oo.', 'wobbbbbow', 'wobebbbow', 'wobbbbbow', '.oobbboo.', '...ooo...'],
+  };
+  function darken(hex: string, f: number) { const n = parseInt(hex.slice(1), 16); return `rgb(${((n >> 16 & 255) * f) | 0},${((n >> 8 & 255) * f) | 0},${((n & 255) * f) | 0})`; }
+  const DARK: Record<string, string> = {}; for (const k of Object.keys(C)) DARK[k] = darken(C[k as CKey].color, 0.58);
+  function drawSprite(spr: string[], cx: number, cy: number, px: number, body: string, dark: string) {
+    const w = spr[0].length, h = spr.length, ox = cx - w * px / 2, oy = cy - h * px / 2;
+    for (let r = 0; r < h; r++) { const row = spr[r]; for (let c = 0; c < w; c++) { const ch = row[c]; if (ch === '.') continue;
+      let col: string;
+      switch (ch) { case 'o': col = '#160c16'; break; case 'b': case 'w': col = body; break; case 'd': col = dark; break; case 'e': col = '#ffffff'; break; case 'h': col = 'rgba(255,255,255,0.75)'; break; case 's': col = '#cfd6dd'; break; case 'g': col = '#9a6a3a'; break; default: col = body; }
+      g2d.fillStyle = col; g2d.fillRect(ox + c * px, oy + r * px, px + 0.6, px + 0.6);
+    } }
+  }
   function drawCreature(cr: Creature) {
-    const x = sx(cr.x), y = sy(cr.y), def = C[cr.type], r = scale * def.r;
+    const x = sx(cr.x), y = sy(cr.y), def = C[cr.type], spr = SPR[cr.type];
+    const px = scale * (cr.type === 'dragon' ? 0.16 : 0.145);
     g2d.save();
-    if (cr.flash > 0) g2d.globalAlpha = 0.5 + 0.5 * Math.sin(clock * 40);
-    if (def.chain === 'mag' || cr.type === 'dragon') { g2d.shadowColor = def.color; g2d.shadowBlur = scale * 0.5; }
-    g2d.fillStyle = def.color;
-    if (cr.type === 'moss') { for (const [ox, oy] of [[-0.3, 0.1], [0.25, 0], [0, -0.25], [0.05, 0.28]]) { g2d.beginPath(); g2d.arc(x + ox * r * 2, y + oy * r * 2, r * 0.6, 0, TAU); g2d.fill(); } }
-    else if (cr.type === 'insect') { g2d.beginPath(); g2d.ellipse(x, y, r, r * 0.7, 0, 0, TAU); g2d.fill(); g2d.strokeStyle = def.color; g2d.lineWidth = r * 0.18; g2d.beginPath(); g2d.moveTo(x - r * 0.4, y - r * 0.5); g2d.lineTo(x - r * 0.7, y - r); g2d.moveTo(x + r * 0.4, y - r * 0.5); g2d.lineTo(x + r * 0.7, y - r); g2d.stroke(); }
-    else if (cr.type === 'lizard') { g2d.beginPath(); g2d.arc(x, y, r, 0, TAU); g2d.fill(); g2d.fillStyle = '#cfd6dd'; g2d.fillRect(x + r * 0.5, y - r, r * 0.16, r * 1.5); g2d.fillStyle = '#9a6a3a'; roundRect(x - r * 1.0, y - r * 0.5, r * 0.4, r, r * 0.1); g2d.fill(); }
-    else if (cr.type === 'element') { g2d.beginPath(); g2d.moveTo(x, y - r); g2d.lineTo(x + r * 0.7, y); g2d.lineTo(x, y + r); g2d.lineTo(x - r * 0.7, y); g2d.closePath(); g2d.fill(); }
-    else if (cr.type === 'lilith') { g2d.beginPath(); g2d.arc(x, y, r * 0.8, 0, TAU); g2d.fill(); g2d.beginPath(); g2d.moveTo(x - r * 0.6, y); g2d.lineTo(x - r * 1.5, y - r * 0.7); g2d.lineTo(x - r * 0.5, y - r * 0.6); g2d.closePath(); g2d.fill(); g2d.beginPath(); g2d.moveTo(x + r * 0.6, y); g2d.lineTo(x + r * 1.5, y - r * 0.7); g2d.lineTo(x + r * 0.5, y - r * 0.6); g2d.closePath(); g2d.fill(); }
-    else { g2d.beginPath(); g2d.arc(x, y, r, 0, TAU); g2d.fill(); g2d.beginPath(); g2d.moveTo(x - r, y); g2d.lineTo(x - r * 1.9, y - r * 0.7); g2d.lineTo(x - r * 0.8, y - r * 0.95); g2d.closePath(); g2d.fill(); g2d.beginPath(); g2d.moveTo(x + r, y); g2d.lineTo(x + r * 1.9, y - r * 0.7); g2d.lineTo(x + r * 0.8, y - r * 0.95); g2d.closePath(); g2d.fill(); }
+    if (def.chain === 'mag' || cr.type === 'lizard') { g2d.shadowColor = def.color; g2d.shadowBlur = scale * 0.45; }
+    drawSprite(spr, x, y, px, def.color, DARK[cr.type]);
     g2d.restore();
-    if (cr.type !== 'moss') { g2d.fillStyle = '#1a0f1a'; g2d.fillRect(x - r * 0.38, y - r * 0.12, r * 0.24, r * 0.28); g2d.fillRect(x + r * 0.14, y - r * 0.12, r * 0.24, r * 0.28); }
-    if (cr.hp < cr.maxhp) hpBar(x, y - r - scale * 0.2, cr.hp / cr.maxhp);
+    if (cr.flash > 0) { g2d.save(); g2d.globalAlpha = 0.5 * (0.5 + 0.5 * Math.sin(clock * 40)); const w = spr[0].length * px, h = spr.length * px; g2d.fillStyle = '#fff'; g2d.fillRect(x - w / 2, y - h / 2, w, h); g2d.restore(); }
+    if (cr.hp < cr.maxhp) hpBar(x, y - spr.length * px / 2 - scale * 0.16, cr.hp / cr.maxhp);
   }
 
   function drawHero(h: Hero) {
