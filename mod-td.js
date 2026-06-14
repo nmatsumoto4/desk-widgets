@@ -420,26 +420,109 @@ window.createWidgetTD = function (ctx) {
     g2d.globalAlpha = 1;
   }
 
+  const TAU = Math.PI * 2;
+  // 兵器ごとに見た目（シルエット）を作り分ける。同じ「色違いの砲塔」にならないように
   function drawTower(t) {
     const def = TOWERS[t.type];
-    const cx = sx(t.c) + scale / 2, cy = sy(t.r) + scale / 2;
-    // 台座
-    g2d.fillStyle = '#2a2a31';
-    roundRect(sx(t.c) + scale * 0.1, sy(t.r) + scale * 0.1, scale * 0.8, scale * 0.8, scale * 0.2); g2d.fill();
-    // 砲身
-    g2d.save();
-    g2d.translate(cx, cy); g2d.rotate(t.angle);
-    g2d.fillStyle = def.color;
-    g2d.fillRect(0, -scale * 0.1, scale * 0.42, scale * 0.2);
-    g2d.restore();
-    // 砲塔（発光）
-    g2d.save(); g2d.shadowColor = def.color; g2d.shadowBlur = scale * 0.5;
-    g2d.fillStyle = def.color;
-    g2d.beginPath(); g2d.arc(cx, cy, scale * 0.26, 0, Math.PI * 2); g2d.fill();
-    g2d.restore();
+    const x0 = sx(t.c), y0 = sy(t.r), cx = x0 + scale / 2, cy = y0 + scale / 2, ang = t.angle;
+    // 台座（共通）＋上面ハイライト
+    g2d.fillStyle = '#23232b';
+    roundRect(x0 + scale * 0.08, y0 + scale * 0.1, scale * 0.84, scale * 0.82, scale * 0.18); g2d.fill();
+    g2d.fillStyle = 'rgba(255,255,255,0.06)';
+    roundRect(x0 + scale * 0.08, y0 + scale * 0.1, scale * 0.84, scale * 0.3, scale * 0.16); g2d.fill();
+    const glow = (b) => { g2d.shadowColor = def.color; g2d.shadowBlur = scale * (b || 0.5); };
+    const orb = (ox, oy, rr, b) => { g2d.save(); glow(b); g2d.fillStyle = def.color; g2d.beginPath(); g2d.arc(ox, oy, scale * rr, 0, TAU); g2d.fill(); g2d.restore(); };
+
+    switch (t.type) {
+      case 'arrow': { // クロスボウ：弓＋細いシャフト＋矢じり（回転）
+        g2d.save(); g2d.translate(cx, cy); g2d.rotate(ang);
+        g2d.fillStyle = '#6b563f'; g2d.fillRect(-scale * 0.18, -scale * 0.22, scale * 0.1, scale * 0.44); // 弓
+        g2d.fillStyle = '#caa86a'; g2d.fillRect(-scale * 0.1, -scale * 0.05, scale * 0.5, scale * 0.1);   // シャフト
+        g2d.save(); glow(0.4); g2d.fillStyle = def.color;
+        g2d.beginPath(); g2d.moveTo(scale * 0.5, 0); g2d.lineTo(scale * 0.3, -scale * 0.15); g2d.lineTo(scale * 0.3, scale * 0.15); g2d.closePath(); g2d.fill(); // 矢じり
+        g2d.restore(); g2d.restore();
+        orb(cx, cy, 0.14, 0.4);
+        break;
+      }
+      case 'cannon': { // 太い砲身＋丸い砲口（回転）
+        g2d.save(); g2d.translate(cx, cy); g2d.rotate(ang);
+        g2d.fillStyle = '#3a3a44'; g2d.fillRect(0, -scale * 0.17, scale * 0.4, scale * 0.34);
+        orb(scale * 0.42, 0, 0.15, 0.5); // translate 済みのため局所座標で砲口を描く
+        g2d.restore();
+        g2d.fillStyle = def.color; g2d.beginPath(); g2d.arc(cx, cy, scale * 0.24, 0, TAU); g2d.fill();
+        g2d.fillStyle = '#23232b'; g2d.beginPath(); g2d.arc(cx, cy, scale * 0.12, 0, TAU); g2d.fill();
+        break;
+      }
+      case 'sniper': { // 長く細い砲身＋スコープ（回転）
+        g2d.save(); g2d.translate(cx, cy); g2d.rotate(ang);
+        g2d.fillStyle = '#3a3340'; g2d.fillRect(0, -scale * 0.05, scale * 0.64, scale * 0.1);
+        g2d.save(); glow(0.45); g2d.fillStyle = def.color; g2d.fillRect(scale * 0.52, -scale * 0.06, scale * 0.12, scale * 0.12); g2d.restore();
+        g2d.restore();
+        orb(cx, cy, 0.2, 0.5);
+        g2d.fillStyle = '#fff'; g2d.beginPath(); g2d.arc(cx, cy, scale * 0.07, 0, TAU); g2d.fill(); // スコープ
+        break;
+      }
+      case 'laser': { // 細身エミッタ＋放熱フィン＋レンズ（回転）
+        g2d.save(); g2d.translate(cx, cy); g2d.rotate(ang);
+        g2d.fillStyle = '#40303a'; g2d.fillRect(0, -scale * 0.08, scale * 0.46, scale * 0.16);
+        g2d.fillStyle = '#2a2030'; g2d.fillRect(scale * 0.1, -scale * 0.18, scale * 0.07, scale * 0.36); g2d.fillRect(scale * 0.26, -scale * 0.18, scale * 0.07, scale * 0.36);
+        g2d.save(); glow(0.8); g2d.fillStyle = def.color; g2d.beginPath(); g2d.arc(scale * 0.46, 0, scale * 0.1, 0, TAU); g2d.fill(); g2d.restore();
+        g2d.restore();
+        orb(cx, cy, 0.18, 0.6);
+        break;
+      }
+      case 'missile': { // ランチャー箱＋3 連発射口（回転）
+        g2d.save(); g2d.translate(cx, cy); g2d.rotate(ang);
+        g2d.fillStyle = '#4a4f55'; roundRect(-scale * 0.06, -scale * 0.24, scale * 0.42, scale * 0.48, scale * 0.06); g2d.fill();
+        g2d.fillStyle = '#1e2125';
+        for (const oy of [-0.13, 0, 0.13]) g2d.fillRect(scale * 0.26, oy * scale - scale * 0.045, scale * 0.12, scale * 0.09);
+        g2d.save(); glow(0.5); g2d.fillStyle = def.color;
+        for (const oy of [-0.13, 0, 0.13]) { g2d.beginPath(); g2d.arc(scale * 0.36, oy * scale, scale * 0.035, 0, TAU); g2d.fill(); }
+        g2d.restore(); g2d.restore();
+        break;
+      }
+      case 'frost': { // 氷晶（ダイヤ）＋脈動するオーラ環（回転なし）
+        g2d.save(); glow(0.8); g2d.fillStyle = def.color;
+        g2d.beginPath(); g2d.moveTo(cx, cy - scale * 0.32); g2d.lineTo(cx + scale * 0.22, cy); g2d.lineTo(cx, cy + scale * 0.32); g2d.lineTo(cx - scale * 0.22, cy); g2d.closePath(); g2d.fill();
+        g2d.restore();
+        g2d.fillStyle = 'rgba(255,255,255,0.75)';
+        g2d.beginPath(); g2d.moveTo(cx, cy - scale * 0.32); g2d.lineTo(cx + scale * 0.09, cy - scale * 0.06); g2d.lineTo(cx, cy + scale * 0.04); g2d.lineTo(cx - scale * 0.09, cy - scale * 0.06); g2d.closePath(); g2d.fill();
+        g2d.strokeStyle = 'rgba(120,230,230,0.25)'; g2d.lineWidth = scale * 0.06;
+        g2d.beginPath(); g2d.arc(cx, cy, scale * 0.42 + Math.sin(clock * 3) * scale * 0.05, 0, TAU); g2d.stroke();
+        break;
+      }
+      case 'tesla': { // コイル：支柱＋2 電極＋頂部球＋明滅する火花（回転なし）
+        g2d.fillStyle = '#3a3320'; g2d.fillRect(cx - scale * 0.06, cy - scale * 0.05, scale * 0.12, scale * 0.32);
+        g2d.save(); glow(0.8); g2d.fillStyle = def.color;
+        g2d.beginPath(); g2d.arc(cx - scale * 0.15, cy - scale * 0.08, scale * 0.09, 0, TAU); g2d.fill();
+        g2d.beginPath(); g2d.arc(cx + scale * 0.15, cy - scale * 0.08, scale * 0.09, 0, TAU); g2d.fill();
+        g2d.beginPath(); g2d.arc(cx, cy - scale * 0.24, scale * 0.12, 0, TAU); g2d.fill();
+        g2d.restore();
+        if (((clock * 8) | 0) % 2 === 0) {
+          g2d.strokeStyle = def.color; g2d.lineWidth = scale * 0.05;
+          g2d.beginPath(); g2d.moveTo(cx - scale * 0.15, cy - scale * 0.08); g2d.lineTo(cx, cy - scale * 0.24); g2d.lineTo(cx + scale * 0.15, cy - scale * 0.08); g2d.stroke();
+        }
+        break;
+      }
+      case 'poison': { // 大釜：泡立つ緑（回転なし）
+        g2d.fillStyle = '#2c3a22'; roundRect(x0 + scale * 0.18, y0 + scale * 0.32, scale * 0.64, scale * 0.48, scale * 0.14); g2d.fill();
+        g2d.save(); glow(0.6); g2d.fillStyle = def.color;
+        g2d.beginPath(); g2d.ellipse(cx, cy, scale * 0.26, scale * 0.15, 0, 0, TAU); g2d.fill(); g2d.restore();
+        g2d.fillStyle = 'rgba(205,240,150,0.9)';
+        const bp = (clock * 2) % 1, bp2 = (clock * 2 + 0.5) % 1;
+        g2d.beginPath(); g2d.arc(cx - scale * 0.08, cy - bp * scale * 0.22, scale * 0.05 * (1 - bp), 0, TAU); g2d.fill();
+        g2d.beginPath(); g2d.arc(cx + scale * 0.1, cy - bp2 * scale * 0.22, scale * 0.04 * (1 - bp2), 0, TAU); g2d.fill();
+        break;
+      }
+      default: {
+        g2d.save(); g2d.translate(cx, cy); g2d.rotate(ang); g2d.fillStyle = def.color; g2d.fillRect(0, -scale * 0.1, scale * 0.42, scale * 0.2); g2d.restore();
+        orb(cx, cy, 0.26, 0.5);
+      }
+    }
+    g2d.shadowBlur = 0;
     // 強化レベルのピップ
     g2d.fillStyle = '#fff';
-    for (let i = 0; i < t.level; i++) g2d.fillRect(sx(t.c) + scale * 0.16 + i * scale * 0.16, sy(t.r) + scale * 0.78, scale * 0.1, scale * 0.1);
+    for (let i = 0; i < t.level; i++) g2d.fillRect(x0 + scale * 0.16 + i * scale * 0.16, y0 + scale * 0.82, scale * 0.09, scale * 0.09);
   }
 
   function drawEnemy(e) {
