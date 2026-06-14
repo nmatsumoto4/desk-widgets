@@ -228,12 +228,14 @@ window.createWidgetInvaders = function (ctx) {
     if (pBullets.length >= 3 || fireCd > 0) return;
     pBullets.push({ x: player.x + PLAYER_W / 2, y: PLAYER_Y - 1 });
     fireCd = 0.18;
+    if (window.SFX) SFX.shoot();
   }
 
   function loseLife() {
     lives--;
     invuln = 1.2;
     iBullets = [];
+    if (window.SFX) SFX.explode();
     updateScores();
     if (lives <= 0) gameOver();
   }
@@ -318,6 +320,7 @@ window.createWidgetInvaders = function (ctx) {
         if (b.x >= v.x && b.x <= v.x + INV_W && b.y >= v.y && b.y <= v.y + INV_H) {
           v.alive = false;
           b.dead = true;
+          if (window.SFX) SFX.hit();
           score += 10 + (rowsForLevel(level) - 1 - v.row) * 5;
           updateScores();
           break;
@@ -342,6 +345,7 @@ window.createWidgetInvaders = function (ctx) {
     // ウェーブクリア判定
     if (state === 'play' && aliveInvaders().length === 0) {
       score += 100 * level;
+      if (window.SFX) SFX.levelup();
       updateScores();
       state = 'waveclear';
       waveTicks = Math.round(900 / TICK_MS);

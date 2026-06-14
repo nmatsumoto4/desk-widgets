@@ -63,7 +63,9 @@ function createWindow(mode) {
       // フォーカスなしで常時動くウィジェットなので、
       // バックグラウンド時のタイマー抑制を無効化する（これがないと
       // 非フォーカス時にゲームオーバー後の自動リスタート等が止まる）
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      // 操作なしでも効果音を鳴らせるように
+      autoplayPolicy: 'no-user-gesture-required'
     }
   });
 

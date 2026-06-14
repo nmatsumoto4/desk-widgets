@@ -137,6 +137,7 @@ window.createWidgetBreakout = function (ctx) {
   }
   function applyItem(type) {
     flash = 1;
+    if (window.SFX) SFX.item();
     if (type === 'multi') {
       const cur = balls.slice();
       for (const b of cur) {
@@ -178,6 +179,7 @@ window.createWidgetBreakout = function (ctx) {
         const ang = -Math.PI / 2 + clamp(off, -1, 1) * 1.05;
         b.vx = Math.cos(ang) * sp; b.vy = Math.sin(ang) * sp;
         b.y = PADDLE_Y - b.r - 0.1;
+        if (window.SFX) SFX.bounce();
       }
       // ブロック
       for (const br of bricks) {
@@ -187,10 +189,11 @@ window.createWidgetBreakout = function (ctx) {
         const ox = Math.min(b.x + b.r - br.x, br.x + br.w - (b.x - b.r));
         const oy = Math.min(b.y + b.r - br.y, br.y + br.h - (b.y - b.r));
         if (ox < oy) b.vx = -b.vx; else b.vy = -b.vy;
-        if (br.steel) break;       // 壊せない（反射のみ）
+        if (br.steel) { if (window.SFX) SFX.bounce(); break; } // 壊せない（反射のみ）
         br.hp--;
         score += 10 * level;
         noBreak = 0;               // 崩した＝停滞解除
+        if (window.SFX) SFX.brick();
         if (br.hp <= 0) {
           burst(br.x + br.w / 2, br.y + br.h / 2, br.hue);
           maybeDropItem(br.x + br.w / 2, br.y + br.h / 2);
@@ -265,6 +268,7 @@ window.createWidgetBreakout = function (ctx) {
     balls = balls.filter((b) => b.y - b.r < FH);
     if (balls.length === 0) {
       lives--;
+      if (window.SFX) SFX.die();
       updateScores();
       if (lives <= 0) { gameOver(); render(); return; }
       flash = 1; spawnBall(true);
@@ -289,6 +293,7 @@ window.createWidgetBreakout = function (ctx) {
       state = 'levelup';
       levelupTicks = Math.round(900 / TICK_MS);
       flash = 1;
+      if (window.SFX) SFX.levelup();
       ctx.showOverlay(`LEVEL ${level + 1}`, 'クリア！');
     }
     render();

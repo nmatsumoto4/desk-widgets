@@ -90,6 +90,7 @@ window.createWidgetRush = function (ctx) {
         session++;
         total++;
         localStorage.setItem(TOTAL_KEY, String(total));
+        if (window.SFX) SFX.win();
         ctx.showOverlay('CLEAR!', `${movesUsed} 手（最短 ${minMoves} 手）`);
         updateScores();
       }

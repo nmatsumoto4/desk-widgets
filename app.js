@@ -109,6 +109,11 @@
     if (window.widgetAPI) window.widgetAPI.toggleHideAll();
   });
 
+  const muteBtn = document.getElementById('mute-btn');
+  function refreshMute() { muteBtn.textContent = window.SFX && window.SFX.isMuted() ? '🔇' : '🔊'; }
+  muteBtn.addEventListener('click', () => { if (window.SFX) { window.SFX.toggle(); refreshMute(); } });
+  refreshMute();
+
   closeBtn.addEventListener('click', () => window.close());
 
   // フッターの表示はボタンを兼ねる：手動モード中にクリックすると AI を再開

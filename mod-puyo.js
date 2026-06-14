@@ -188,6 +188,7 @@ window.createWidgetPuyo = function (ctx) {
     }
     cur = null;
     chainNum = 0;
+    if (window.SFX) SFX.land();
     applyGravityAnimated();
     state = 'settle';
   }
@@ -268,14 +269,16 @@ window.createWidgetPuyo = function (ctx) {
       }
       case 'settle': {
         // スプリングで 0 へ（少しオーバーシュート＝スライムがぷるっと着地）
+        // AI 自動運転中は更に速く落とす（観賞テンポ重視）
+        const stiff = auto ? 0.9 : 0.5, damp = auto ? 0.38 : 0.58, eps = auto ? 0.12 : 0.05;
         let moving = false;
         for (let r = 0; r < H; r++) {
           for (let c = 0; c < W; c++) {
             if (voff[r][c] !== 0 || vvel[r][c] !== 0) {
-              vvel[r][c] += (-voff[r][c]) * 0.5;   // ばねを強く＝速く落ちる
-              vvel[r][c] *= 0.58;
+              vvel[r][c] += (-voff[r][c]) * stiff;
+              vvel[r][c] *= damp;
               voff[r][c] += vvel[r][c];
-              if (Math.abs(voff[r][c]) < 0.05 && Math.abs(vvel[r][c]) < 0.05) { voff[r][c] = 0; vvel[r][c] = 0; }
+              if (Math.abs(voff[r][c]) < eps && Math.abs(vvel[r][c]) < eps) { voff[r][c] = 0; vvel[r][c] = 0; }
               else moving = true;
             }
           }
@@ -291,6 +294,7 @@ window.createWidgetPuyo = function (ctx) {
         } else {
           if (chainNum === 0) chainSeed = grid.map((row) => row.slice()); // 連鎖開始盤面を記録
           chainNum++;
+          if (window.SFX) SFX.pop(chainNum);
           chainLabelTicks = CHAIN_LABEL_TICKS;
           popping = groups.flat();
           popGain = popping.length * 10 *

@@ -348,6 +348,7 @@ window.createWidgetBomber = function (ctx) {
     const idx = bombs.indexOf(bomb);
     if (idx < 0) return;
     bombs.splice(idx, 1);
+    if (window.SFX) SFX.explode();
     const owner = players[bomb.owner];
     if (owner) owner.bombs = Math.max(0, owner.bombs - 1);
 
@@ -373,6 +374,7 @@ window.createWidgetBomber = function (ctx) {
   }
 
   function applyPowerup(pl, pu) {
+    if (window.SFX) SFX.item();
     if (pu.type === 'bomb') pl.maxBombs = Math.min(6, pl.maxBombs + 1);
     else if (pu.type === 'fire') pl.power = Math.min(7, pl.power + 1);
     else if (pu.type === 'speed') pl.speed = Math.min(6, pl.speed + 0.6);

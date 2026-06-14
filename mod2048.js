@@ -114,7 +114,9 @@ window.createWidget2048 = function (ctx) {
 
     const dir = AI.bestMove(game.grid());
     if (dir) {
+      const before = game.score;
       game.move(dir);
+      if (window.SFX && game.score > before) SFX.merge(game.maxTile());
       render();
     } else {
       game.over = true;

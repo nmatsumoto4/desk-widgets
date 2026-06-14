@@ -100,7 +100,9 @@ window.createWidgetTetris = function (ctx) {
     if (full.length) {
       clearRows = full;
       clearTimer = CLEAR_TICKS;
+      if (window.SFX) SFX.clearLine();
     } else {
+      if (window.SFX) SFX.land();
       spawn();
     }
   }
