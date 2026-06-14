@@ -10,11 +10,13 @@
 // 安全なら敵を狙う／ソフトブロックを壊す爆弾を「逃げ道がある時だけ」設置する。
 
 window.createWidgetBomber = function (ctx) {
-  const COLS = 11, ROWS = 11;
+  let COLS = 11, ROWS = 11;  // 盤面サイズ。ウィンドウを広げると増える（可変）
+  const CELL_TARGET = 26;    // 1 マスの目安サイズ（CSS px）。これで window から列数・行数を決める
   const TICK_MS = 33;
   const FUSE = 1.9;          // 爆弾の導火（秒）
   const FLAME_DUR = 0.5;     // 炎の持続（秒）
   const ROUND_LIMIT = 50;    // ラウンド最長（秒）。膠着防止
+  const AUTO_BOOST = 1.7;    // AI 自動運転時だけ移動を高速化（手動は等倍）
   const RESTART_TICKS = Math.round(1600 / TICK_MS);
   const DENS_KEY = 'widgetBomber.dens';
   const ROUNDS_KEY = 'widgetBomber.rounds';
@@ -74,12 +76,14 @@ window.createWidgetBomber = function (ctx) {
   const isWallCell = (r, c) => r === 0 || c === 0 || r === ROWS - 1 || c === COLS - 1 ||
                                (r % 2 === 0 && c % 2 === 0);
 
-  const SPAWNS = [
+  // 現在のサイズから 4 隅スポーンを求める
+  const spawnsFor = () => [
     { r: 1, c: 1 }, { r: 1, c: COLS - 2 },
     { r: ROWS - 2, c: 1 }, { r: ROWS - 2, c: COLS - 2 }
   ];
 
   function newRound() {
+    const SPAWNS = spawnsFor();
     grid = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
     // 壁
     for (let r = 0; r < ROWS; r++)
@@ -109,7 +113,7 @@ window.createWidgetBomber = function (ctx) {
       id: i, color: P_COLORS[i], accent: P_ACCENT[i],
       x: s.c + 0.5, y: s.r + 0.5,
       alive: true, moving: false, tx: 0, ty: 0,
-      maxBombs: 1, bombs: 0, power: 2, speed: 5.4,
+      maxBombs: 1, bombs: 0, power: 2, speed: 3.2,
       think: 0, lastDir: null
     }));
     state = 'play';
@@ -249,7 +253,10 @@ window.createWidgetBomber = function (ctx) {
     if (pl.bombs < pl.maxBombs && !bombAt(pr, pc)) {
       const adjSoft = DIRS.some(([dr, dc]) => inB(pr + dr, pc + dc) && grid[pr + dr][pc + dc] === 1);
       const canHit = bombHitsEnemy(pr, pc, pl.power, pl);
-      if (canHit || adjSoft) {
+      // 敵が 2 マス以内に近づいたら圧をかけて置く（広い盤面での膠着を防ぐ）
+      const enemyClose = players.some((p) => p.alive && p.id !== pl.id &&
+        Math.abs(Math.floor(p.y) - pr) + Math.abs(Math.floor(p.x) - pc) <= 2);
+      if (canHit || adjSoft || enemyClose) {
         const after = dangerMap({ r: pr, c: pc, power: pl.power, fuse: FUSE });
         if (dangerOf(after, pr, pc) >= 0 && escapeExists(pr, pc, after)) {
           placeBomb(pl, pr, pc);
@@ -322,7 +329,7 @@ window.createWidgetBomber = function (ctx) {
   function applyPowerup(pl, pu) {
     if (pu.type === 'bomb') pl.maxBombs = Math.min(6, pl.maxBombs + 1);
     else if (pu.type === 'fire') pl.power = Math.min(7, pl.power + 1);
-    else if (pu.type === 'speed') pl.speed = Math.min(9, pl.speed + 0.8);
+    else if (pu.type === 'speed') pl.speed = Math.min(6, pl.speed + 0.6);
   }
 
   // ---- 進行 ----
@@ -355,7 +362,8 @@ window.createWidgetBomber = function (ctx) {
       if (pl.moving) {
         const dx = pl.tx - pl.x, dy = pl.ty - pl.y;
         const d = Math.hypot(dx, dy);
-        const step = pl.speed * dt;
+        // AI 自動運転時のみ高速化。手動モード中は全員が通常速度
+        const step = pl.speed * (auto ? AUTO_BOOST : 1) * dt;
         if (d <= step) { pl.x = pl.tx; pl.y = pl.ty; pl.moving = false; }
         else { pl.x += (dx / d) * step; pl.y += (dy / d) * step; }
       }
@@ -400,9 +408,30 @@ window.createWidgetBomber = function (ctx) {
   // ---- 描画 ----
   let scale = 20, offX = 0, offY = 0;
 
+  // 値を [lo,hi] に収めつつ奇数にする（壁の格子と 4 隅スポーンのため奇数必須）
+  function oddClamp(v, lo, hi) {
+    v = Math.max(lo, Math.min(hi, v));
+    if (v % 2 === 0) v = (v - 1 >= lo) ? v - 1 : v + 1;
+    return v;
+  }
+
+  // ウィンドウの大きさからマス数（COLS×ROWS）を決める。広げるほどマスが増える
+  function applyGridSize() {
+    const rect = wrapEl.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const cols = oddClamp(Math.round(rect.width / CELL_TARGET), 11, 17);
+    const rows = oddClamp(Math.round(rect.height / CELL_TARGET), 11, 19);
+    if (cols !== COLS || rows !== ROWS || grid.length === 0) {
+      COLS = cols; ROWS = rows;
+      if (round === 0) round = 1;
+      newRound(); // サイズが変わったらその大きさで作り直す
+    }
+  }
+
   function relayout() {
     const rect = wrapEl.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
+    applyGridSize();
     const dpr = window.devicePixelRatio || 1;
     canvas.width = Math.floor(rect.width * dpr);
     canvas.height = Math.floor(rect.height * dpr);
@@ -526,8 +555,7 @@ window.createWidgetBomber = function (ctx) {
     show() {
       wrapEl.style.display = 'flex';
       ctrlEl.style.display = 'inline-flex';
-      if (players.length === 0) resetGame();
-      relayout();
+      relayout(); // ウィンドウサイズからマス数を決めて盤面を生成（初回・サイズ変更時）
       updateScores();
       updateDensLabel();
       if (timer === null) timer = setInterval(tick, TICK_MS);
@@ -559,6 +587,6 @@ window.createWidgetBomber = function (ctx) {
                      alive: players.filter((p) => p.alive).length,
                      bombs: bombs.length, flames: flames.length,
                      softBlocks: grid.flat().filter((v) => v === 1).length,
-                     densIdx })
+                     densIdx, cols: COLS, rows: ROWS })
   };
 };
