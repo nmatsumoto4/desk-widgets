@@ -9,7 +9,7 @@ const RENDERER = [
   'puyo', 'puyo-ai', 'mod-puyo',
   'rush', 'mod-rush',
   'mod-invaders', 'mod-bomber', 'mod-tetris', 'mod-snake', 'mod-life',
-  'mod-breakout', 'mod-td',
+  'mod-breakout', 'mod-td', 'mod-hero',
   'app',
 ];
 

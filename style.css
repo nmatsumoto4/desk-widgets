@@ -202,8 +202,8 @@ html, body {
   border-radius: 6px;
 }
 
-/* テトリス・スネーク・ライフゲーム・ブロック崩し・タワーディフェンス盤面 */
-#tetris, #snake, #life, #breakout, #td {
+/* テトリス・スネーク・ライフゲーム・ブロック崩し・タワーディフェンス・ヒーロー盤面 */
+#tetris, #snake, #life, #breakout, #td, #hero {
   display: none;
   width: 100%;
   height: 100%;
@@ -211,7 +211,7 @@ html, body {
   justify-content: center;
 }
 
-#tetris-canvas, #snake-canvas, #life-canvas, #breakout-canvas, #td-canvas {
+#tetris-canvas, #snake-canvas, #life-canvas, #breakout-canvas, #td-canvas, #hero-canvas {
   border-radius: 6px;
 }
 
