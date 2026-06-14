@@ -239,7 +239,7 @@ window.createWidgetPuyo = function (ctx) {
         if (grid[0][SPAWN_COL] !== 0 || grid[1][SPAWN_COL] !== 0) { gameOver(); break; }
         cur = { colors: queue.shift(), r: 1, c: SPAWN_COL, rot: 0 };
         queue.push(rndPair());
-        target = auto ? PuyoAI.bestPlacement(grid, cur.colors) : null;
+        target = auto ? PuyoAI.bestPlacement(grid, cur.colors, maxChain) : null;
         gravCounter = 0;
         state = 'falling';
         break;
@@ -272,10 +272,10 @@ window.createWidgetPuyo = function (ctx) {
         for (let r = 0; r < H; r++) {
           for (let c = 0; c < W; c++) {
             if (voff[r][c] !== 0 || vvel[r][c] !== 0) {
-              vvel[r][c] += (-voff[r][c]) * 0.24;
-              vvel[r][c] *= 0.72;
+              vvel[r][c] += (-voff[r][c]) * 0.5;   // ばねを強く＝速く落ちる
+              vvel[r][c] *= 0.58;
               voff[r][c] += vvel[r][c];
-              if (Math.abs(voff[r][c]) < 0.01 && Math.abs(vvel[r][c]) < 0.01) { voff[r][c] = 0; vvel[r][c] = 0; }
+              if (Math.abs(voff[r][c]) < 0.05 && Math.abs(vvel[r][c]) < 0.05) { voff[r][c] = 0; vvel[r][c] = 0; }
               else moving = true;
             }
           }
@@ -388,8 +388,8 @@ window.createWidgetPuyo = function (ctx) {
         if (grid[r][c] === 0 || popSet.has(`${r},${c}`)) continue;
         // 落下速度からスクワッシュ&ストレッチ（落下中は縦伸び、着地の跳ねで縦縮み）
         const v = vvel[r][c] || 0;
-        const sys = 1 + Math.max(-0.32, Math.min(0.42, v * 0.6));
-        const sxs = 1 - Math.max(-0.32, Math.min(0.42, v * 0.6)) * 0.7;
+        const sys = 1 + Math.max(-0.28, Math.min(0.36, v * 0.4));
+        const sxs = 1 - Math.max(-0.28, Math.min(0.36, v * 0.4)) * 0.7;
         drawPuyoSprite(c * cell, (r - 1) * cell + voff[r][c] * cell, cell, grid[r][c], 1, sxs, sys);
       }
     }
@@ -455,7 +455,7 @@ window.createWidgetPuyo = function (ctx) {
       auto = on;
       if (on) {
         // 落下途中で AI に切替わったら、そこから最善手を再計算
-        if (state === 'falling' && cur) target = PuyoAI.bestPlacement(grid, cur.colors);
+        if (state === 'falling' && cur) target = PuyoAI.bestPlacement(grid, cur.colors, maxChain);
       }
     },
     key(e) {

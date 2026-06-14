@@ -45,7 +45,8 @@
     return links;
   }
 
-  function bestPlacement(grid, pairColors) {
+  // recordChain: 現在の最大連鎖記録。これを超える発火を最優先で狙う
+  function bestPlacement(grid, pairColors, recordChain = 0) {
     let best = null;
     let bestV = -Infinity;
 
@@ -79,15 +80,15 @@
           if (danger) {
             // 危険水位：生存最優先。持っている連鎖を惜しまず発火する
             v += res.chains * 2500 + res.chains * res.chains * 320;
-          } else if (res.chains >= 5) {
-            // 大きく育った連鎖の発火を高評価（大連鎖狙い）
-            v += res.chains * res.chains * 460;
+          } else if (res.chains > recordChain && res.chains >= 2) {
+            // 記録更新の発火を最優先（常に最大連鎖超えを狙う）
+            v += 12000 + res.chains * res.chains * 600;
           } else if (res.chains >= 1) {
-            // 育成中の発火は種の浪費なので抑制（より長く我慢）
-            v -= 360;
+            // 記録未満の発火は強く抑制：我慢して記録超えまで育てる
+            v -= 1600 - res.chains * 120; // 大きめの連鎖ほど抑制を少し緩める
           }
-          // 連鎖ポテンシャルを育てる（高ポテンシャルほど加速度的に評価）
-          v += P * 440 + P * P * 150;
+          // 連鎖ポテンシャルを最重視で育てる（記録超えの土台づくり）
+          v += P * 620 + P * P * 300;
           v += linkScore(res.grid) * 18;
           // 高さペナルティ（積みすぎ防止・スポーン列は低く保つ）
           for (let c = 0; c < W; c++) {
