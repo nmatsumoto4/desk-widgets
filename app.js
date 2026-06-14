@@ -8,7 +8,6 @@
   const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー', bomber: 'ボンバーマン', tetris: 'テトリス', snake: 'スネーク' };
   const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV', bomber: 'ボム', tetris: 'テト', snake: 'スネク' };
 
-  const titleEl = document.getElementById('title');
   const scoreEl = document.getElementById('score');
   const bestEl = document.getElementById('best');
   const infoEl = document.getElementById('games-count');
@@ -16,7 +15,7 @@
   const overlayEl = document.getElementById('overlay');
   const overlayTitleEl = document.getElementById('overlay-title');
   const overlaySubEl = document.getElementById('overlay-sub');
-  const modeBtn = document.getElementById('mode-btn');
+  const modeSelectEl = document.getElementById('mode-select');
   const addBtn = document.getElementById('add-btn');
   const closeBtn = document.getElementById('close-btn');
 
@@ -53,14 +52,20 @@
   let active = widgets[mode];
   let manual = false;
 
+  // セレクトボックスにゲーム一覧を登録
+  for (const m of MODE_ORDER) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = GAME_TITLES[m];
+    modeSelectEl.appendChild(opt);
+  }
+
   function nextMode() {
     return MODE_ORDER[(MODE_ORDER.indexOf(mode) + 1) % MODE_ORDER.length];
   }
 
   function applyLabels() {
-    titleEl.textContent = GAME_TITLES[mode];
-    modeBtn.textContent = GAME_SHORT[nextMode()];
-    modeBtn.title = `${GAME_TITLES[nextMode()]} に切替`;
+    modeSelectEl.value = mode;
   }
 
   function setManual(m) {
@@ -71,10 +76,12 @@
     modeIndicatorEl.classList.toggle('manual', m);
   }
 
-  function switchMode() {
+  // 指定したゲームに切り替える（セレクトボックス・テスト共通）
+  function setMode(newMode) {
+    if (!widgets[newMode] || newMode === mode) { modeSelectEl.value = mode; return; }
     active.hide();
     ctx.hideOverlay();
-    mode = nextMode();
+    mode = newMode;
     localStorage.setItem(MODE_KEY, mode);
     active = widgets[mode];
     applyLabels();
@@ -82,7 +89,9 @@
     active.setAuto(!manual);
   }
 
-  modeBtn.addEventListener('click', switchMode);
+  function switchMode() { setMode(nextMode()); }
+
+  modeSelectEl.addEventListener('change', () => setMode(modeSelectEl.value));
 
   addBtn.addEventListener('click', () => {
     if (window.widgetAPI) {
@@ -105,6 +114,8 @@
   window.addEventListener('blur', () => setManual(false));
 
   window.addEventListener('keydown', (e) => {
+    // セレクトボックス操作中はキーをゲームに奪わせない
+    if (document.activeElement === modeSelectEl) return;
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) return;
     e.preventDefault();
     // フォーカス中に矢印キーを押したら（AI 再開ボタン押下後でも）手動に戻す
@@ -131,6 +142,7 @@
     get mode() { return mode; },
     get active() { return active; },
     switchMode,
+    setMode,
     setManual
   };
 })();

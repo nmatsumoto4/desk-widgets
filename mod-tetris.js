@@ -61,6 +61,9 @@ window.createWidgetTetris = function (ctx) {
   let best = Number(localStorage.getItem(BEST_KEY) || 0);
   let auto = false, timer = null, over = false;
   let moveAccum = 0, gravityAccum = 0, restartCountdown = -1;
+  let clearRows = [];        // 消去演出中の行
+  let clearTimer = 0;        // 残り演出ティック
+  const CLEAR_TICKS = 11;    // 消去エフェクトの長さ（約 0.36 秒）
 
   const emptyBoard = () => Array.from({ length: ROWS }, () => new Array(COLS).fill(''));
   const randType = () => TYPES[(Math.random() * TYPES.length) | 0];
@@ -90,22 +93,29 @@ window.createWidgetTetris = function (ctx) {
   function lockPiece() {
     for (const [r, c] of cellsOf(cur.type, cur.rot, cur.r, cur.c))
       if (r >= 0) board[r][c] = SHAPES[cur.type].color;
-    // ライン消去
-    let cleared = 0;
-    for (let r = ROWS - 1; r >= 0; r--) {
-      if (board[r].every((v) => v !== '')) {
-        board.splice(r, 1);
-        board.unshift(new Array(COLS).fill(''));
-        cleared++; r++;
-      }
-    }
-    if (cleared > 0) {
-      score += [0, 100, 300, 500, 800][cleared] * level;
-      lines += cleared;
-      level = 1 + Math.floor(lines / 10);
-    }
-    updateScores();
     cur = null;
+    // 揃った行があれば消去演出へ（実際の削除は performClear で）
+    const full = [];
+    for (let r = 0; r < ROWS; r++) if (board[r].every((v) => v !== '')) full.push(r);
+    if (full.length) {
+      clearRows = full;
+      clearTimer = CLEAR_TICKS;
+    } else {
+      spawn();
+    }
+  }
+
+  function performClear() {
+    const cleared = clearRows.length;
+    clearRows.sort((a, b) => b - a).forEach((r) => {
+      board.splice(r, 1);
+      board.unshift(new Array(COLS).fill(''));
+    });
+    score += [0, 100, 300, 500, 800][cleared] * level;
+    lines += cleared;
+    level = 1 + Math.floor(lines / 10);
+    clearRows = [];
+    updateScores();
     spawn();
   }
 
@@ -196,6 +206,7 @@ window.createWidgetTetris = function (ctx) {
     board = emptyBoard();
     score = 0; lines = 0; level = 1;
     over = false; restartCountdown = -1;
+    clearRows = []; clearTimer = 0;
     cur = null; nextType = randType();
     ctx.hideOverlay();
     spawn();
@@ -210,6 +221,11 @@ window.createWidgetTetris = function (ctx) {
   function tick() {
     if (over) {
       if (auto && restartCountdown >= 0 && --restartCountdown <= 0) reset();
+      render();
+      return;
+    }
+    if (clearTimer > 0) { // 消去エフェクト中は進行を止める
+      if (--clearTimer <= 0) performClear();
       render();
       return;
     }
@@ -266,10 +282,30 @@ window.createWidgetTetris = function (ctx) {
     for (let c = 1; c < COLS; c++) { g2d.beginPath(); g2d.moveTo(sx(c), sy(0)); g2d.lineTo(sx(c), sy(0) + boardH); g2d.stroke(); }
     for (let r = 1; r < ROWS; r++) { g2d.beginPath(); g2d.moveTo(sx(0), sy(r)); g2d.lineTo(sx(0) + boardW, sy(r)); g2d.stroke(); }
 
-    // 固定ブロック
-    for (let r = 0; r < ROWS; r++)
+    // 固定ブロック（消去演出中の行は除く）
+    for (let r = 0; r < ROWS; r++) {
+      if (clearTimer > 0 && clearRows.includes(r)) continue;
       for (let c = 0; c < COLS; c++)
         if (board[r][c]) block(sx(c), sy(r), board[r][c]);
+    }
+
+    // ライン消去エフェクト：白フラッシュ＋中央から外へ消えていくワイプ
+    if (clearTimer > 0) {
+      const p = 1 - clearTimer / CLEAR_TICKS;        // 0→1 で進行
+      const flash = 0.5 + 0.5 * Math.sin(clearTimer * 1.3);
+      const reach = p * (COLS / 2 + 0.5);            // 中央からの消去到達幅
+      for (const r of clearRows) {
+        for (let c = 0; c < COLS; c++) {
+          if (Math.abs(c - (COLS - 1) / 2) < reach) continue; // 既に消えた中央部
+          block(sx(c), sy(r), board[r][c] || '#ffffff');
+          g2d.fillStyle = `rgba(255,255,255,${0.65 * flash})`;
+          g2d.fillRect(sx(c), sy(r), scale, scale);
+        }
+        // 端に残る光のライン
+        g2d.fillStyle = `rgba(255,255,255,${0.25 * flash})`;
+        g2d.fillRect(sx(0), sy(r) + scale * 0.45, COLS * scale, scale * 0.1);
+      }
+    }
 
     // ゴースト＋落下中ピース
     if (cur) {
@@ -328,7 +364,7 @@ window.createWidgetTetris = function (ctx) {
     reset,
     isOver: () => over,
     _tick: tick,
-    _state: () => ({ over, level, lines, score, auto,
+    _state: () => ({ over, level, lines, score, auto, clearing: clearTimer > 0,
                      maxHeight: Math.max(...columnHeights(board)) })
   };
 };

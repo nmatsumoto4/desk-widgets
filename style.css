@@ -40,14 +40,23 @@ html, body {
   -webkit-app-region: drag;
 }
 
-#title {
-  font-size: clamp(12px, 5.5vw, 18px);
+/* ゲーム選択セレクトボックス（タイトル兼用） */
+#mode-select {
+  -webkit-app-region: no-drag;
+  font-size: clamp(11px, 4.6vw, 16px);
   font-weight: bold;
   color: var(--text-dark);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: #eee4da;
+  border: 1px solid #d8cfc0;
+  border-radius: 5px;
+  padding: 2px 4px;
+  max-width: 42%;
   flex-shrink: 1;
+  cursor: pointer;
+}
+
+#mode-select:hover {
+  background: #e6dac9;
 }
 
 #scores {
