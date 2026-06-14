@@ -254,30 +254,36 @@ window.createWidgetSnake = function (ctx) {
       for (let c = 0; c < COLS; c++)
         if ((r + c) % 2 === 0) g2d.fillRect(sx(c), sy(r), scale + 0.5, scale + 0.5);
 
-    // エサ（リンゴ風）
+    // エサ（リンゴ風・発光）
     if (food) {
       const x = sx(food.c), y = sy(food.r);
-      const pulse = 1 + 0.08 * Math.sin(animClock * 6);
+      const pulse = 1 + 0.1 * Math.sin(animClock * 6);
       const rad = scale * 0.34 * pulse;
+      g2d.save();
+      g2d.shadowColor = '#ff5a4d'; g2d.shadowBlur = scale * 0.9 * pulse;
       g2d.fillStyle = '#e74c3c';
       g2d.beginPath(); g2d.arc(x + scale / 2, y + scale * 0.56, rad, 0, Math.PI * 2); g2d.fill();
+      g2d.restore();
       g2d.fillStyle = '#6ab04c';
       g2d.fillRect(x + scale * 0.46, y + scale * 0.12, scale * 0.08, scale * 0.22);
-      g2d.fillStyle = 'rgba(255,255,255,0.55)';
+      g2d.fillStyle = 'rgba(255,255,255,0.6)';
       g2d.beginPath(); g2d.arc(x + scale * 0.4, y + scale * 0.46, rad * 0.28, 0, Math.PI * 2); g2d.fill();
     }
 
-    // スネーク（頭→尾でグラデーション、ドット風の角丸ブロック）
+    // スネーク（頭→尾でグラデーション、ドット風の角丸ブロック。頭は発光）
     const n = snake.length;
     for (let i = n - 1; i >= 0; i--) {
       const s = snake[i];
       const x = sx(s.c), y = sy(s.r);
       const t = n > 1 ? i / (n - 1) : 0; // 0=head, 1=tail
       const lightness = 58 - t * 26;
+      g2d.save();
+      if (i === 0) { g2d.shadowColor = 'hsl(140,80%,55%)'; g2d.shadowBlur = scale * 0.8; }
       g2d.fillStyle = `hsl(140, 65%, ${lightness}%)`;
       const pad = scale * 0.08;
-      roundRect(x + pad, y + pad, scale - pad * 2, scale - pad * 2, scale * 0.28);
+      roundRect(x + pad, y + pad, scale - pad * 2, scale - pad * 2, scale * 0.3);
       g2d.fill();
+      g2d.restore();
       if (i === 0) drawHead(x, y);
     }
     if (over) {

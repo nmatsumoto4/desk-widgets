@@ -231,9 +231,31 @@ window.createWidgetLife = function (ctx) {
 
   function render() {
     g2d.clearRect(0, 0, canvas.width, canvas.height);
-    g2d.fillStyle = '#0c0f14';
+    const bg = g2d.createLinearGradient(0, offY, 0, offY + ROWS * scale);
+    bg.addColorStop(0, '#0a0d16'); bg.addColorStop(1, '#11151f');
+    g2d.fillStyle = bg;
     g2d.fillRect(offX, offY, COLS * scale, ROWS * scale);
     const r = Math.max(1, scale * 0.42);
+
+    // ネオンの発光（加算合成のハロー）。重い shadowBlur を避け、数が多い時はスキップ
+    if (population <= 1600) {
+      g2d.globalCompositeOperation = 'lighter';
+      g2d.globalAlpha = 0.35;
+      for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS; col++) {
+          const k = idx(row, col);
+          if (!cell[k]) continue;
+          g2d.fillStyle = ageColor(age[k]);
+          g2d.beginPath();
+          g2d.arc(offX + col * scale + scale / 2, offY + row * scale + scale / 2, r * 2, 0, Math.PI * 2);
+          g2d.fill();
+        }
+      }
+      g2d.globalAlpha = 1;
+      g2d.globalCompositeOperation = 'source-over';
+    }
+
+    // 本体
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
         const k = idx(row, col);

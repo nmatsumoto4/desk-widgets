@@ -503,9 +503,21 @@ window.createWidgetBomber = function (ctx) {
   const sx = (c) => offX + c * scale;
   const sy = (r) => offY + r * scale;
 
+  function roundRect(x, y, w, h, r) {
+    g2d.beginPath();
+    g2d.moveTo(x + r, y);
+    g2d.arcTo(x + w, y, x + w, y + h, r);
+    g2d.arcTo(x + w, y + h, x, y + h, r);
+    g2d.arcTo(x, y + h, x, y, r);
+    g2d.arcTo(x, y, x + w, y, r);
+    g2d.closePath();
+  }
+
   function render() {
     g2d.clearRect(0, 0, canvas.width, canvas.height);
-    g2d.fillStyle = '#1d6a2e';
+    const bg = g2d.createLinearGradient(0, offY, 0, offY + ROWS * scale);
+    bg.addColorStop(0, '#236e33'); bg.addColorStop(1, '#16551f');
+    g2d.fillStyle = bg;
     g2d.fillRect(offX, offY, COLS * scale, ROWS * scale);
 
     // マス
@@ -531,12 +543,16 @@ window.createWidgetBomber = function (ctx) {
       }
     }
 
-    // パワーアップ
+    // パワーアップ（発光）
     for (const pu of powerups) {
       const x = sx(pu.c), y = sy(pu.r);
-      g2d.fillStyle = '#111';
-      g2d.fillRect(x + scale * 0.2, y + scale * 0.2, scale * 0.6, scale * 0.6);
-      g2d.fillStyle = pu.type === 'bomb' ? '#e74c3c' : pu.type === 'fire' ? '#f39c12' : '#2ecc71';
+      const col = pu.type === 'bomb' ? '#e74c3c' : pu.type === 'fire' ? '#f39c12' : '#2ecc71';
+      g2d.save();
+      g2d.shadowColor = col; g2d.shadowBlur = scale * 0.6;
+      g2d.fillStyle = '#15151a';
+      g2d.fillRect(x + scale * 0.18, y + scale * 0.18, scale * 0.64, scale * 0.64);
+      g2d.restore();
+      g2d.fillStyle = col;
       g2d.font = `bold ${Math.floor(scale * 0.5)}px sans-serif`;
       g2d.textAlign = 'center'; g2d.textBaseline = 'middle';
       g2d.fillText(pu.type === 'bomb' ? 'B' : pu.type === 'fire' ? 'F' : 'S',
@@ -544,24 +560,32 @@ window.createWidgetBomber = function (ctx) {
       g2d.textAlign = 'left'; g2d.textBaseline = 'alphabetic';
     }
 
-    // 爆弾
+    // 爆弾（発光＋脈動）
     for (const b of bombs) {
       const x = sx(b.c) + scale / 2, y = sy(b.r) + scale / 2;
       const pulse = 0.34 + 0.05 * Math.sin(b.fuse * 12);
+      g2d.save();
+      g2d.shadowColor = '#ff5530'; g2d.shadowBlur = scale * 0.5 * (1 + Math.sin(b.fuse * 12) * 0.4);
       g2d.fillStyle = '#15151a';
       g2d.beginPath(); g2d.arc(x, y, scale * pulse, 0, Math.PI * 2); g2d.fill();
-      g2d.fillStyle = '#e74c3c';
-      g2d.fillRect(x - scale * 0.05, y - scale * 0.4, scale * 0.1, scale * 0.12);
+      g2d.restore();
+      g2d.fillStyle = 'rgba(255,255,255,0.5)';
+      g2d.beginPath(); g2d.arc(x - scale * 0.12, y - scale * 0.12, scale * 0.08, 0, Math.PI * 2); g2d.fill();
+      g2d.fillStyle = '#ff3b30';
+      g2d.fillRect(x - scale * 0.05, y - scale * 0.42, scale * 0.1, scale * 0.14);
     }
 
-    // 炎
+    // 炎（発光・丸み）
+    g2d.save();
+    g2d.shadowColor = '#ff7a18'; g2d.shadowBlur = scale * 0.7;
     for (const f of flames) {
       const x = sx(f.c), y = sy(f.r);
-      g2d.fillStyle = f.t > FLAME_DUR * 0.5 ? '#fff3b0' : '#ff8c1a';
-      g2d.fillRect(x + scale * 0.08, y + scale * 0.08, scale * 0.84, scale * 0.84);
+      g2d.fillStyle = f.t > FLAME_DUR * 0.5 ? '#fff3b0' : '#ffae3a';
+      roundRect(x + scale * 0.06, y + scale * 0.06, scale * 0.88, scale * 0.88, scale * 0.22); g2d.fill();
       g2d.fillStyle = '#ff5722';
-      g2d.fillRect(x + scale * 0.24, y + scale * 0.24, scale * 0.52, scale * 0.52);
+      roundRect(x + scale * 0.24, y + scale * 0.24, scale * 0.52, scale * 0.52, scale * 0.16); g2d.fill();
     }
+    g2d.restore();
 
     // プレイヤー（ドット絵ロボット）
     for (const pl of players) {

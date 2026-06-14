@@ -73,8 +73,15 @@ window.createWidgetInvaders = function (ctx) {
   let restartCountdown = -1;
   let waveTicks = 0;
   let manualFire = false;
+  let particles = [];        // 撃破エフェクト
 
   function rand(n) { return Math.floor(Math.random() * n); }
+  function burst(x, y, color) {
+    for (let i = 0; i < 8; i++) {
+      const a = Math.random() * Math.PI * 2, s = 18 + Math.random() * 36;
+      particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.3 + Math.random() * 0.3, color });
+    }
+  }
 
   function rowsForLevel(lv) {
     return Math.min(3 + Math.floor((lv - 1) / 3), 5);
@@ -313,6 +320,8 @@ window.createWidgetInvaders = function (ctx) {
     // 弾の移動
     for (const b of pBullets) b.y -= 120 * dt;
     for (const b of iBullets) b.y += enemyBulletSpeed() * dt;
+    for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+    particles = particles.filter((p) => p.life > 0);
 
     // 衝突：自機弾 × 敵
     for (const b of pBullets) {
@@ -322,6 +331,7 @@ window.createWidgetInvaders = function (ctx) {
           v.alive = false;
           b.dead = true;
           if (window.SFX) SFX.hit();
+          burst(v.x + INV_W / 2, v.y + INV_H / 2, ROW_COLORS[v.row % ROW_COLORS.length]);
           score += 10 + (rowsForLevel(level) - 1 - v.row) * 5;
           updateScores();
           break;
@@ -390,8 +400,10 @@ window.createWidgetInvaders = function (ctx) {
   }
 
   function render() {
-    // 背景（キャンバス全体を宇宙色で塗りつぶし、レターボックスを目立たせない）
-    g2d.fillStyle = '#0d0b1a';
+    // 背景（縦グラデの宇宙）
+    const bg = g2d.createLinearGradient(0, 0, 0, canvas.height);
+    bg.addColorStop(0, '#0a0816'); bg.addColorStop(1, '#141026');
+    g2d.fillStyle = bg;
     g2d.fillRect(0, 0, canvas.width, canvas.height);
 
     // 敵
@@ -401,20 +413,38 @@ window.createWidgetInvaders = function (ctx) {
       drawPattern(INV_FRAMES[frame], v.x, v.y, INV_W, INV_H, ROW_COLORS[v.row % ROW_COLORS.length]);
     }
 
-    // 自機（被弾無敵中は点滅）
+    // 撃破パーティクル
+    for (const p of particles) {
+      g2d.globalAlpha = Math.max(0, p.life * 2.5);
+      g2d.fillStyle = p.color;
+      g2d.fillRect(px(p.x) - scale * 0.4, py(p.y) - scale * 0.4, scale * 0.8, scale * 0.8);
+    }
+    g2d.globalAlpha = 1;
+
+    // 自機（被弾無敵中は点滅・発光）
     if (!(invuln > 0 && Math.floor(animT * 12) % 2)) {
+      g2d.save();
+      g2d.shadowColor = '#9fe8ff'; g2d.shadowBlur = scale * 1.6;
       drawPattern(SHIP, player.x, PLAYER_Y, PLAYER_W, PLAYER_H, '#e8e8f0');
+      g2d.restore();
     }
 
-    // 弾
-    g2d.fillStyle = '#9be8ff';
-    for (const b of pBullets) g2d.fillRect(px(b.x) - scale * 0.4, py(b.y), scale * 0.8, scale * 3);
-    g2d.fillStyle = '#ff7b7b';
-    for (const b of iBullets) g2d.fillRect(px(b.x) - scale * 0.4, py(b.y), scale * 0.8, scale * 3);
+    // 弾（発光）
+    g2d.save();
+    g2d.shadowColor = '#9be8ff'; g2d.shadowBlur = scale * 1.4;
+    g2d.fillStyle = '#bfefff';
+    for (const b of pBullets) g2d.fillRect(px(b.x) - scale * 0.45, py(b.y), scale * 0.9, scale * 3);
+    g2d.shadowColor = '#ff7b7b';
+    g2d.fillStyle = '#ff9b9b';
+    for (const b of iBullets) g2d.fillRect(px(b.x) - scale * 0.45, py(b.y), scale * 0.9, scale * 3);
+    g2d.restore();
 
-    // 地上ライン
-    g2d.fillStyle = '#3a8f4a';
+    // 地上ライン（発光）
+    g2d.save();
+    g2d.shadowColor = '#2ecc71'; g2d.shadowBlur = scale * 1.2;
+    g2d.fillStyle = '#3fbf5a';
     g2d.fillRect(px(0), py(PLAYER_Y + PLAYER_H + 1), FW * scale, scale * 0.8);
+    g2d.restore();
   }
 
   // ---- 共通インターフェース ----

@@ -146,14 +146,22 @@ window.createWidgetRush = function (ctx) {
     render();
   }
 
+  function shade(hex, f) {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v) => Math.max(0, Math.min(255, Math.round(v)));
+    return `rgb(${ch((n >> 16 & 255) * f)},${ch((n >> 8 & 255) * f)},${ch((n & 255) * f)})`;
+  }
+
   function render() {
     g2d.clearRect(0, 0, canvas.width, canvas.height);
     const fieldW = N * cell;
 
-    // 盤面
-    g2d.fillStyle = '#4a4139';
+    // 盤面（縦グラデ＋格子）
+    const bg = g2d.createLinearGradient(0, 0, 0, canvas.height);
+    bg.addColorStop(0, '#3d362f'); bg.addColorStop(1, '#2a2521');
+    g2d.fillStyle = bg;
     g2d.fillRect(0, 0, fieldW, canvas.height);
-    g2d.strokeStyle = 'rgba(255,255,255,0.07)';
+    g2d.strokeStyle = 'rgba(255,255,255,0.06)';
     g2d.lineWidth = 1;
     for (let i = 1; i < N; i++) {
       g2d.beginPath();
@@ -162,40 +170,48 @@ window.createWidgetRush = function (ctx) {
       g2d.stroke();
     }
 
-    // 出口（矢印）
+    // 出口（矢印・発光）
     const ey = (EXIT_ROW + 0.5) * cell;
-    g2d.fillStyle = '#27ae60';
+    g2d.save();
+    g2d.shadowColor = '#2ecc71'; g2d.shadowBlur = cell * 0.4;
+    g2d.fillStyle = '#2ecc71';
     g2d.beginPath();
-    g2d.moveTo(fieldW + cell * 0.05, ey - cell * 0.22);
-    g2d.lineTo(fieldW + cell * 0.32, ey);
-    g2d.lineTo(fieldW + cell * 0.05, ey + cell * 0.22);
+    g2d.moveTo(fieldW + cell * 0.05, ey - cell * 0.24);
+    g2d.lineTo(fieldW + cell * 0.34, ey);
+    g2d.lineTo(fieldW + cell * 0.05, ey + cell * 0.24);
     g2d.closePath();
     g2d.fill();
+    g2d.restore();
 
-    // 車両
+    // 車両（グラデ＋光沢、赤い車は発光）
     vehicles.forEach((v, i) => {
       const w = (v.horiz ? v.len : 1) * cell;
       const h = (v.horiz ? 1 : v.len) * cell;
       const x = v.c * cell, y = v.r * cell;
       const pad = cell * 0.08;
-      g2d.fillStyle = CAR_COLORS[i % CAR_COLORS.length];
-      roundRect(x + pad, y + pad, w - pad * 2, h - pad * 2, cell * 0.18);
-      g2d.fill();
+      const bx = x + pad, by = y + pad, bw = w - pad * 2, bh = h - pad * 2;
+      const col = CAR_COLORS[i % CAR_COLORS.length];
+      g2d.save();
+      if (i === 0) { g2d.shadowColor = col; g2d.shadowBlur = cell * 0.45; }
+      const g = g2d.createLinearGradient(bx, by, bx, by + bh);
+      g.addColorStop(0, shade(col, 1.25)); g.addColorStop(0.5, col); g.addColorStop(1, shade(col, 0.7));
+      g2d.fillStyle = g;
+      roundRect(bx, by, bw, bh, cell * 0.22); g2d.fill();
+      g2d.restore();
+      // 上面ハイライト
+      g2d.fillStyle = 'rgba(255,255,255,0.25)';
+      roundRect(bx + cell * 0.12, by + cell * 0.1, bw - cell * 0.24, bh * 0.28, cell * 0.12); g2d.fill();
       if (i === selected) {
         g2d.strokeStyle = '#fff';
         g2d.lineWidth = Math.max(2, cell * 0.06);
-        roundRect(x + pad, y + pad, w - pad * 2, h - pad * 2, cell * 0.18);
-        g2d.stroke();
+        roundRect(bx, by, bw, bh, cell * 0.22); g2d.stroke();
       }
-      // 赤い車に★マーク
       if (i === 0) {
-        g2d.fillStyle = 'rgba(255,255,255,0.9)';
-        g2d.font = `bold ${Math.floor(cell * 0.4)}px sans-serif`;
-        g2d.textAlign = 'center';
-        g2d.textBaseline = 'middle';
+        g2d.fillStyle = 'rgba(255,255,255,0.95)';
+        g2d.font = `bold ${Math.floor(cell * 0.42)}px sans-serif`;
+        g2d.textAlign = 'center'; g2d.textBaseline = 'middle';
         g2d.fillText('★', x + w / 2, y + h / 2);
-        g2d.textAlign = 'left';
-        g2d.textBaseline = 'alphabetic';
+        g2d.textAlign = 'left'; g2d.textBaseline = 'alphabetic';
       }
     });
   }

@@ -382,8 +382,10 @@ window.createWidgetPuyo = function (ctx) {
   function render() {
     const fieldW = W * cell;
     g2d.clearRect(0, 0, canvas.width, canvas.height);
-    // フィールド背景
-    g2d.fillStyle = '#4a4139';
+    // フィールド背景（縦グラデ）
+    const bg = g2d.createLinearGradient(0, 0, 0, canvas.height);
+    bg.addColorStop(0, '#534338'); bg.addColorStop(1, '#352c25');
+    g2d.fillStyle = bg;
     g2d.fillRect(0, 0, fieldW, canvas.height);
 
     const popSet = new Set(popping.map(([r, c]) => `${r},${c}`));

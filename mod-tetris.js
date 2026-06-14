@@ -309,15 +309,18 @@ window.createWidgetTetris = function (ctx) {
       }
     }
 
-    // ゴースト＋落下中ピース
+    // ゴースト＋落下中ピース（落下中は発光）
     if (cur) {
       const gr = dropRow(cur.type, cur.rot, cur.c);
-      g2d.globalAlpha = 0.25;
+      g2d.globalAlpha = 0.22;
       for (const [r, c] of cellsOf(cur.type, cur.rot, gr, cur.c))
         if (r >= 0) block(sx(c), sy(r), SHAPES[cur.type].color);
       g2d.globalAlpha = 1;
+      g2d.save();
+      g2d.shadowColor = SHAPES[cur.type].color; g2d.shadowBlur = scale * 0.7;
       for (const [r, c] of cellsOf(cur.type, cur.rot, cur.r, cur.c))
         if (r >= 0) block(sx(c), sy(r), SHAPES[cur.type].color);
+      g2d.restore();
     }
 
     // NEXT
