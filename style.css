@@ -121,6 +121,10 @@ html, body {
   color: #27ae60;
 }
 
+#hide-btn:hover {
+  color: #2980b9;
+}
+
 #close-btn:hover {
   color: #e74c3c;
 }

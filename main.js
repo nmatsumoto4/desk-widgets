@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, globalShortcut } = require('electron');
 const path = require('path');
 
 const WIDTH = 280;
@@ -62,9 +62,38 @@ function createWindow(mode) {
   win.once('ready-to-show', () => win.showInactive());
 }
 
-app.whenReady().then(() => createWindow());
+// すべてのウィジェットを一括で隠す／再表示する
+function toggleHideAll() {
+  const wins = BrowserWindow.getAllWindows();
+  if (wins.length === 0) return;
+  const anyVisible = wins.some((w) => w.isVisible());
+  for (const w of wins) {
+    if (anyVisible) w.hide();
+    else w.showInactive();
+  }
+}
+
+// 一括非表示のグローバルショートカット（候補を順に試し、空いているものを登録）
+let hideAllAccelerator = null;
+function registerHideShortcut() {
+  for (const acc of ['CommandOrControl+Shift+H', 'CommandOrControl+Alt+H', 'CommandOrControl+Shift+0']) {
+    if (globalShortcut.register(acc, toggleHideAll)) { hideAllAccelerator = acc; break; }
+  }
+  console.log('[deskwidgets] hide-all shortcut:', hideAllAccelerator || '(登録失敗)');
+}
+
+app.whenReady().then(() => {
+  createWindow();
+  registerHideShortcut();
+});
 
 // 「＋」ボタン：現在のモードを引き継いだ新しいウィジェットを開く
 ipcMain.on('new-widget', (_event, mode) => createWindow(mode));
 
+// ボタンからの一括非表示トグル
+ipcMain.on('toggle-hide-all', () => toggleHideAll());
+// テスト・確認用：表示中ウィンドウ数
+ipcMain.handle('widgets-visible-count', () => BrowserWindow.getAllWindows().filter((w) => w.isVisible()).length);
+
+app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed', () => app.quit());

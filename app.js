@@ -103,6 +103,10 @@
     }
   });
 
+  document.getElementById('hide-btn').addEventListener('click', () => {
+    if (window.widgetAPI) window.widgetAPI.toggleHideAll();
+  });
+
   closeBtn.addEventListener('click', () => window.close());
 
   // フッターの表示はボタンを兼ねる：手動モード中にクリックすると AI を再開
