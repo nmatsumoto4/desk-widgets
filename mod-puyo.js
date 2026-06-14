@@ -15,6 +15,51 @@ window.createWidgetPuyo = function (ctx) {
   const g2d = canvas.getContext('2d');
   const PUYO_COLORS = ['', '#e74c3c', '#27ae60', '#3498db', '#f1c40f'];
 
+  // ぷよのドット絵（14×14）。B=本体 / D=影 / H=ツヤ / W=白目 / P=瞳 / .=透明
+  // 辺はセル端まで埋め、角だけ落とす → 同色が隣り合うと自然につながって見える（本家風）
+  const PUYO_SPRITE = [
+    '.BBBBBBBBBBBB.',
+    'BBBBBBBBBBBBBB',
+    'BBBBBBBBBBBBBB',
+    'BBHHBBBBBBBBBB',
+    'BBHHBBBBBBBBBB',
+    'BBBBBBBBBBBBBB',
+    'BWWWBBBBWWWBBB',
+    'BWPWBBBBWPWBBB',
+    'BWWWBBBBWWWBBB',
+    'BBBBBBBBBBBBBB',
+    'BBBBBBBBBBBBBB',
+    'DDBBBBBBBBBBDD',
+    'DDDDDDDDDDDDDD',
+    '.DDDDDDDDDDDD.'
+  ];
+
+  function shadeDark(hex) {
+    const n = parseInt(hex.slice(1), 16), f = 0.62;
+    return `rgb(${Math.round((n >> 16 & 255) * f)},${Math.round((n >> 8 & 255) * f)},${Math.round((n & 255) * f)})`;
+  }
+  function shadeLight(hex) {
+    const n = parseInt(hex.slice(1), 16), m = (v) => Math.round(v + (255 - v) * 0.55);
+    return `rgb(${m(n >> 16 & 255)},${m(n >> 8 & 255)},${m(n & 255)})`;
+  }
+
+  function drawPuyoSprite(x, y, size, color, alpha = 1) {
+    const base = PUYO_COLORS[color];
+    const colMap = { B: base, D: shadeDark(base), H: shadeLight(base), W: '#ffffff', P: '#3a3a3a' };
+    const dot = size / 14;
+    g2d.globalAlpha = alpha;
+    for (let pr = 0; pr < 14; pr++) {
+      const row = PUYO_SPRITE[pr];
+      for (let pc = 0; pc < 14; pc++) {
+        const ch = row[pc];
+        if (ch === '.') continue;
+        g2d.fillStyle = colMap[ch];
+        g2d.fillRect(x + pc * dot, y + pr * dot, dot + 0.6, dot + 0.6);
+      }
+    }
+    g2d.globalAlpha = 1;
+  }
+
   let grid = Puyo.emptyGrid();
   let queue = [rndPair(), rndPair()];
   let cur = null;          // 落下中ペア {colors:[軸,子], r, c, rot}
@@ -223,19 +268,7 @@ window.createWidgetPuyo = function (ctx) {
 
   function drawPuyo(r, c, color, alpha = 1) {
     if (r < 1) return; // 隠し段は描かない
-    const x = c * cell, y = (r - 1) * cell;
-    g2d.globalAlpha = alpha;
-    g2d.fillStyle = PUYO_COLORS[color];
-    g2d.beginPath();
-    g2d.arc(x + cell / 2, y + cell / 2, cell * 0.42, 0, Math.PI * 2);
-    g2d.fill();
-    // 目（ハイライト）
-    g2d.fillStyle = 'rgba(255,255,255,0.85)';
-    g2d.beginPath();
-    g2d.arc(x + cell * 0.38, y + cell * 0.4, cell * 0.1, 0, Math.PI * 2);
-    g2d.arc(x + cell * 0.62, y + cell * 0.4, cell * 0.1, 0, Math.PI * 2);
-    g2d.fill();
-    g2d.globalAlpha = 1;
+    drawPuyoSprite(c * cell, (r - 1) * cell, cell, color, alpha);
   }
 
   function render() {
@@ -262,14 +295,8 @@ window.createWidgetPuyo = function (ctx) {
     g2d.fillText('NEXT', px, cell * 0.6);
     const next = queue[0];
     if (next) {
-      g2d.fillStyle = PUYO_COLORS[next[1]];
-      g2d.beginPath();
-      g2d.arc(px + cell * 0.5, cell * 1.4, cell * 0.38, 0, Math.PI * 2);
-      g2d.fill();
-      g2d.fillStyle = PUYO_COLORS[next[0]];
-      g2d.beginPath();
-      g2d.arc(px + cell * 0.5, cell * 2.3, cell * 0.38, 0, Math.PI * 2);
-      g2d.fill();
+      drawPuyoSprite(px + cell * 0.1, cell * 0.95, cell * 0.9, next[1]); // 子ぷよ
+      drawPuyoSprite(px + cell * 0.1, cell * 1.9, cell * 0.9, next[0]); // 軸ぷよ
     }
 
     // 連鎖表示
