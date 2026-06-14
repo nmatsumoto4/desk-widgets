@@ -36,6 +36,7 @@
       <div id="tetris"><canvas id="tetris-canvas"></canvas></div>
       <div id="snake"><canvas id="snake-canvas"></canvas></div>
       <div id="life"><canvas id="life-canvas"></canvas></div>
+      <div id="breakout"><canvas id="breakout-canvas"></canvas></div>
       <div id="overlay">
         <span id="overlay-title"></span>
         <span id="overlay-sub"></span>
@@ -58,6 +59,11 @@
         <select id="life-preset" title="プリセットを選択"></select>
         <button id="life-random" title="ランダムを追加">＋ﾗﾝﾀﾞﾑ</button>
       </span>
+      <span id="breakout-ctrl">
+        <button id="breakout-minus" title="開始レベルを下げる">−</button>
+        <span id="breakout-lv-label"></span>
+        <button id="breakout-plus" title="開始レベルを上げる">＋</button>
+      </span>
       <span id="games-count"></span>
     </footer>
   </div>
@@ -75,6 +81,7 @@
   <script src="mod-tetris.js"></script>
   <script src="mod-snake.js"></script>
   <script src="mod-life.js"></script>
+  <script src="mod-breakout.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

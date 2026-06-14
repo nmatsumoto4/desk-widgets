@@ -202,8 +202,8 @@ html, body {
   border-radius: 6px;
 }
 
-/* テトリス・スネーク・ライフゲーム盤面 */
-#tetris, #snake, #life {
+/* テトリス・スネーク・ライフゲーム・ブロック崩し盤面 */
+#tetris, #snake, #life, #breakout {
   display: none;
   width: 100%;
   height: 100%;
@@ -211,9 +211,31 @@ html, body {
   justify-content: center;
 }
 
-#tetris-canvas, #snake-canvas, #life-canvas {
+#tetris-canvas, #snake-canvas, #life-canvas, #breakout-canvas {
   border-radius: 6px;
 }
+
+/* ブロック崩しの開始レベル調整（breakout モード時のみ表示） */
+#breakout-ctrl {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+#breakout-ctrl button {
+  border: none;
+  background: #cdc1b4;
+  color: var(--text-dark);
+  border-radius: 3px;
+  font-size: inherit;
+  font-weight: bold;
+  line-height: 1;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+
+#breakout-ctrl button:hover { background: #b8ab9d; }
+#breakout-lv-label { font-weight: bold; }
 
 /* ライフゲームのプリセット選択（life モード時のみ表示） */
 #life-ctrl {

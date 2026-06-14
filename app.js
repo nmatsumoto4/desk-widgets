@@ -4,9 +4,9 @@
 
 (() => {
   const MODE_KEY = 'widget.mode';
-  const MODE_ORDER = ['2048', 'puyo', 'rush', 'invaders', 'bomber', 'tetris', 'snake', 'life'];
-  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー', bomber: 'ボンバーマン', tetris: 'テトリス', snake: 'スネーク', life: 'ライフゲーム' };
-  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV', bomber: 'ボム', tetris: 'テト', snake: 'スネク', life: 'ライフ' };
+  const MODE_ORDER = ['2048', 'puyo', 'rush', 'invaders', 'bomber', 'tetris', 'snake', 'life', 'breakout'];
+  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー', bomber: 'ボンバーマン', tetris: 'テトリス', snake: 'スネーク', life: 'ライフゲーム', breakout: 'ブロック崩し' };
+  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV', bomber: 'ボム', tetris: 'テト', snake: 'スネク', life: 'ライフ', breakout: 'ブロック' };
 
   const scoreEl = document.getElementById('score');
   const bestEl = document.getElementById('best');
@@ -43,7 +43,8 @@
     bomber: window.createWidgetBomber(ctx),
     tetris: window.createWidgetTetris(ctx),
     snake: window.createWidgetSnake(ctx),
-    life: window.createWidgetLife(ctx)
+    life: window.createWidgetLife(ctx),
+    breakout: window.createWidgetBreakout(ctx)
   };
 
   // 起動モード：URL パラメータ > 前回の選択 > 2048
