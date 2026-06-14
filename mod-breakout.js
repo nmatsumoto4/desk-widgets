@@ -43,6 +43,7 @@ window.createWidgetBreakout = function (ctx) {
   let flash = 0;                // 画面フラッシュ（被弾/レベルアップ）
   let aimT = 0;                 // AI が受ける位置を振るための位相
   let noBreak = 0;              // 壊せるブロックを崩していない経過秒（停滞検出）
+  let steerTimer = 0;          // 再ステアの間隔タイマー
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -197,13 +198,16 @@ window.createWidgetBreakout = function (ctx) {
         updateScores();
         break;
       }
-      // 停滞防止：水平・垂直に寄りすぎたら最低限の速度を確保（無限往復を回避）
-      const sp = Math.hypot(b.vx, b.vy) || ballSpeed();
-      const minVy = sp * 0.34, minVx = sp * 0.12;
-      if (Math.abs(b.vy) < minVy) b.vy = (b.vy >= 0 ? 1 : -1) * minVy;
-      if (Math.abs(b.vx) < minVx) b.vx = (b.vx >= 0 ? 1 : -1) * minVx;
-      const k = sp / (Math.hypot(b.vx, b.vy) || 1);
-      b.vx *= k; b.vy *= k;
+      // 速度を常に一定に正規化し、水平/垂直に寄りすぎを補正
+      // （壁への張り付き・低速停滞・縦横ロックを根本的に防ぐ）
+      const targetSp = ballSpeed();
+      let ux = b.vx, uy = b.vy;
+      const mag = Math.hypot(ux, uy) || 1;
+      ux /= mag; uy /= mag;
+      if (Math.abs(uy) < 0.34) uy = (uy >= 0 ? 1 : -1) * 0.34;
+      if (Math.abs(ux) < 0.26) ux = (ux >= 0 ? 1 : -1) * 0.26;
+      const m2 = Math.hypot(ux, uy) || 1;
+      b.vx = ux / m2 * targetSp; b.vy = uy / m2 * targetSp;
     }
     b.trail.push({ x: b.x, y: b.y });
     if (b.trail.length > 7) b.trail.shift();
@@ -234,9 +238,13 @@ window.createWidgetBreakout = function (ctx) {
       if (best) {
         if (best.vy > 0) {
           const land = predictX(best);
-          const tb = aimBrickX(land);                  // 狙う残ブロックの x
-          // ブロックへ向けて角度をつける（無ければ軽く振る）。常に崩しに行く
-          const off = tb != null ? clamp((tb - land) / 12, -0.7, 0.7) : 0.6 * Math.sin(aimT);
+          const tb = aimBrick(land);                   // 狙う残ブロック
+          // 跳ね返り角を狙うブロックへ厳密に合わせる（off=接触位置 -1..1）
+          let off;
+          if (tb) {
+            const dx = tb.x - land, dy = Math.max(5, PADDLE_Y - tb.y);
+            off = clamp(Math.atan2(dx, dy) / 1.05, -0.9, 0.9);
+          } else off = 0.5 * Math.sin(aimT);
           tgt = land - off * (paddle.w / 2);
         } else {
           tgt = best.x; // 上昇中はボール直下で待機しない＝追従
@@ -248,10 +256,12 @@ window.createWidgetBreakout = function (ctx) {
     }
     paddle.x = clamp(paddle.x, paddle.w / 2, FW - paddle.w / 2);
 
-    noBreak += dt;
+    noBreak += dt; steerTimer -= dt;
     for (const b of balls) moveBall(b, bdt);
-    // 長時間どのブロックも崩していない＝袋小路 → 全ボールを最寄りの壊せるブロックへ向ける
-    if (noBreak > 4) { steerToBricks(); noBreak = 0; }
+    // しばらく崩せていない → 全ボールを壊せるブロックへ向ける（noBreak は実破壊時のみ 0）
+    if (noBreak > 2 && steerTimer <= 0) { steerToBricks(); steerTimer = 1; }
+    // 鋼鉄で囲まれて到達不能などの最終手段：最下段の壊せるブロックを崩す
+    if (noBreak > 7) forceBreakOne();
     balls = balls.filter((b) => b.y - b.r < FH);
     if (balls.length === 0) {
       lives--;
@@ -284,6 +294,18 @@ window.createWidgetBreakout = function (ctx) {
     render();
   }
 
+  // 最終手段：最下段の壊せるブロックを 1 つ崩して詰みを解消する
+  function forceBreakOne() {
+    let target = null, my = -1;
+    for (const br of bricks) { if (br.steel || br.hp <= 0) continue; if (br.y > my) { my = br.y; target = br; } }
+    noBreak = 0;
+    if (!target) return;
+    target.hp = 0;
+    burst(target.x + target.w / 2, target.y + target.h / 2, target.hue);
+    maybeDropItem(target.x + target.w / 2, target.y + target.h / 2);
+    score += 10 * level; updateScores();
+  }
+
   // 全ボールを最寄りの壊せるブロックへ向ける（袋小路からの脱出）
   function steerToBricks() {
     for (const b of balls) {
@@ -295,22 +317,22 @@ window.createWidgetBreakout = function (ctx) {
         if (s > bs) { bs = s; tx = cx; ty = cy; }
       }
       if (tx == null) continue;
-      const sp = Math.hypot(b.vx, b.vy) || ballSpeed();
-      const dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy) || 1;
+      const sp = ballSpeed();
+      const dx = (tx - b.x) + rnd(-3, 3), dy = (ty - b.y), d = Math.hypot(dx, dy) || 1;
       b.vx = dx / d * sp; b.vy = dy / d * sp;
     }
   }
 
-  // 狙うべき残ブロック（壊せるもの）の中心 x。最下段かつ近いものを優先
-  function aimBrickX(fromX) {
-    let bestX = null, bestScore = -Infinity;
+  // 狙うべき残ブロック（壊せるもの）の中心 {x,y}。最下段かつ近いものを優先
+  function aimBrick(fromX) {
+    let best = null, bestScore = -Infinity;
     for (const br of bricks) {
       if (br.steel || br.hp <= 0) continue;
       const cx = br.x + br.w / 2;
       const s = br.y * 2 - Math.abs(cx - fromX); // 下にある・近いほど高評価
-      if (s > bestScore) { bestScore = s; bestX = cx; }
+      if (s > bestScore) { bestScore = s; best = { x: cx, y: br.y + br.h / 2 }; }
     }
-    return bestX;
+    return best;
   }
 
   function predictX(b) {
@@ -488,8 +510,10 @@ window.createWidgetBreakout = function (ctx) {
     relayout, reset: newGame, isOver: () => state === 'gameover',
     _tick: tick,
     _balls: () => balls.map((b) => ({ x: +b.x.toFixed(1), y: +b.y.toFixed(1), vx: +b.vx.toFixed(1), vy: +b.vy.toFixed(1) })),
-    _state: () => ({ state, level, startLevel, score, lives, auto,
-                     balls: balls.length, bricks: bricks.filter((b) => b.hp > 0).length,
+    _state: () => ({ state, level, startLevel, score, lives, auto, noBreak: +noBreak.toFixed(2),
+                     balls: balls.length, paddleX: +paddle.x.toFixed(1),
+                     bricks: bricks.filter((b) => b.hp > 0 && !b.steel).length,
+                     steel: bricks.filter((b) => b.steel).length,
                      items: items.length })
   };
 };

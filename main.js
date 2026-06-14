@@ -94,29 +94,32 @@ function toggleHideAll() {
 // メニューバー（トレイ）アイコン：ショートカット以外で復帰できる導線
 let tray = null;
 
-// アーケード筐体（ゲーセン）風アイコンを矩形で描く。
-// 22×22 論理（×2=44px）に対して上下左右へ余白を取り、画面をくり抜いて
-// メニューバーで小さく・軽く見えるようにする。色は body のみ（画面は透明の穴）。
+// 筐体（ゲーセン）風アイコン。22×22 論理（×2=44px）。
+// 余白を多めにとり、細いアウトライン＋小さな画面で控えめ・軽い見た目にする。
 function buildCabinetIcon(body) {
   const U = 2, SZ = 22 * U;
   const buf = Buffer.alloc(SZ * SZ * 4); // BGRA, 透明
-  const R = (lx, ly, lw, lh, on) => {
+  const R = (lx, ly, lw, lh) => {
     for (let y = ly * U; y < (ly + lh) * U; y++) {
       for (let x = lx * U; x < (lx + lw) * U; x++) {
         if (x < 0 || y < 0 || x >= SZ || y >= SZ) continue;
         const i = (y * SZ + x) * 4;
-        if (on) { buf[i] = body[2]; buf[i + 1] = body[1]; buf[i + 2] = body[0]; buf[i + 3] = 255; }
-        else { buf[i] = 0; buf[i + 1] = 0; buf[i + 2] = 0; buf[i + 3] = 0; }
+        buf[i] = body[2]; buf[i + 1] = body[1]; buf[i + 2] = body[0]; buf[i + 3] = 255;
       }
     }
   };
-  R(4, 2, 14, 2, true);    // マーキー（看板）
-  R(4, 5, 14, 11, true);   // 本体
-  R(6, 7, 10, 5, false);   // 画面（くり抜き）
-  R(6, 14, 10, 1, false);  // コントロールパネルのスリット
-  R(6, 16, 10, 3, false);  // 脚の間を透明に
-  R(4, 16, 2, 3, true);    // 左脚
-  R(16, 16, 2, 3, true);   // 右脚
+  // マーキー（看板）
+  R(8, 5, 6, 1);
+  // 本体の枠（1px アウトライン）
+  R(7, 7, 8, 1);   // 上
+  R(7, 15, 8, 1);  // 下
+  R(7, 7, 1, 9);   // 左
+  R(14, 7, 1, 9);  // 右
+  // 画面（小さく塗る）
+  R(9, 9, 4, 3);
+  // 脚
+  R(8, 16, 1, 2);
+  R(13, 16, 1, 2);
   return nativeImage.createFromBitmap(buf, { width: SZ, height: SZ });
 }
 
@@ -127,8 +130,7 @@ function createTray() {
     const icon = isMac ? buildCabinetIcon([0, 0, 0]) : buildCabinetIcon([225, 225, 230]);
     if (isMac) icon.setTemplateImage(true);
     tray = new Tray(icon);
-    tray.setToolTip(APP_NAME);
-    if (isMac) tray.setTitle(` ${APP_NAME}`); // メニューバーに名前を表示
+    tray.setToolTip(APP_NAME); // 名称はホバー時のみ（メニューバーには文字を出さない）
     tray.setContextMenu(buildTrayMenu());
     tray.on('click', () => setAllVisible(true));
     console.log('[retrocenter] tray created');
