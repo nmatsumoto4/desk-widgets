@@ -12,7 +12,7 @@ window.createWidgetRush = function (ctx) {
   const CARS_MIN = 6, CARS_MAX = 12, CARS_DEFAULT = 10;
 
   const wrapEl = document.getElementById('rush');
-  const canvas = document.getElementById('rush-canvas');
+  const canvas = document.getElementById('rush-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
   const ctrlEl = document.getElementById('rush-ctrl');
   const carsLabelEl = document.getElementById('rush-cars-label');
@@ -45,11 +45,11 @@ window.createWidgetRush = function (ctx) {
 
   function newPuzzle() {
     // 目標手数は台数に応じて引き上げる（デフォルトで複雑な問題）
-    let res = Rush.genPuzzle(carCount, { target: 12 + carCount, budgetMs: 700 });
-    if (!res) res = Rush.genPuzzle(carCount, { target: 4, budgetMs: 1500 });
+    let res = window.Rush.genPuzzle(carCount, { target: 12 + carCount, budgetMs: 700 });
+    if (!res) res = window.Rush.genPuzzle(carCount, { target: 4, budgetMs: 1500 });
     if (!res) { // 理論上ほぼ到達しないが、台数を 1 減らして救済
       carCount = clampCars(carCount - 1);
-      res = Rush.genPuzzle(carCount, { target: 4, budgetMs: 1500 });
+      res = window.Rush.genPuzzle(carCount, { target: 4, budgetMs: 1500 });
     }
     vehicles = res.vehicles;
     plan = res.sol;
@@ -90,7 +90,7 @@ window.createWidgetRush = function (ctx) {
         session++;
         total++;
         localStorage.setItem(TOTAL_KEY, String(total));
-        if (window.SFX) SFX.win();
+        if (window.SFX) window.SFX.win();
         ctx.showOverlay('CLEAR!', `${movesUsed} 手（最短 ${minMoves} 手）`);
         updateScores();
       }
@@ -114,7 +114,7 @@ window.createWidgetRush = function (ctx) {
 
     // 手動操作などで盤面が計画とずれたら現在地から解き直す
     if (planDirty || planPos >= plan.length) {
-      const sol = Rush.solve(vehicles);
+      const sol = window.Rush.solve(vehicles);
       if (!sol) { newPuzzle(); return; } // 起こり得ないが保険
       plan = sol;
       planPos = 0;
@@ -235,7 +235,7 @@ window.createWidgetRush = function (ctx) {
     const c = Math.floor(((e.clientX - rect.left) * dpr) / cell);
     const r = Math.floor(((e.clientY - rect.top) * dpr) / cell);
     selected = -1;
-    const grid = Rush.buildGrid(vehicles);
+    const grid = window.Rush.buildGrid(vehicles);
     if (r >= 0 && r < N && c >= 0 && c < N && grid[r][c] >= 0) {
       selected = grid[r][c];
     }
@@ -283,7 +283,7 @@ window.createWidgetRush = function (ctx) {
       else if (v.horiz && e.key === 'ArrowRight') delta = 1;
       else if (!v.horiz && e.key === 'ArrowUp') delta = -1;
       else if (!v.horiz && e.key === 'ArrowDown') delta = 1;
-      if (delta !== 0 && Rush.canMove(vehicles, selected, delta)) {
+      if (delta !== 0 && window.Rush.canMove(vehicles, selected, delta)) {
         applyMove(selected, delta);
         planDirty = true;
       }

@@ -15,7 +15,7 @@
   const overlayEl = document.getElementById('overlay');
   const overlayTitleEl = document.getElementById('overlay-title');
   const overlaySubEl = document.getElementById('overlay-sub');
-  const modeSelectEl = document.getElementById('mode-select');
+  const modeSelectEl = document.getElementById('mode-select') as HTMLSelectElement;
   const addBtn = document.getElementById('add-btn');
   const closeBtn = document.getElementById('close-btn');
 

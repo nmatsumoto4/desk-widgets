@@ -14,7 +14,7 @@ window.createWidgetSnake = function (ctx) {
   const FOODS_PER_LEVEL = 4;
 
   const wrapEl = document.getElementById('snake');
-  const canvas = document.getElementById('snake-canvas');
+  const canvas = document.getElementById('snake-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
 
   let COLS = 20, ROWS = 24;
@@ -172,7 +172,7 @@ window.createWidgetSnake = function (ctx) {
       foods++;
       score += 10 * level;
       level = 1 + Math.floor(foods / FOODS_PER_LEVEL);
-      if (window.SFX) SFX.eat();
+      if (window.SFX) window.SFX.eat();
       spawnFood();
       updateScores();
     } else {
@@ -183,7 +183,7 @@ window.createWidgetSnake = function (ctx) {
   function gameOver() {
     over = true;
     restartCountdown = RESTART_TICKS;
-    if (window.SFX) SFX.die();
+    if (window.SFX) window.SFX.die();
     if (score > best) { best = score; localStorage.setItem(BEST_KEY, String(best)); }
     ctx.showOverlay('GAME OVER', auto ? `Lv.${level} ・自動リスタート…` : `Lv.${level} ・キーで再開`);
   }

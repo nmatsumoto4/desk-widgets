@@ -5,6 +5,11 @@ const SIZE = 4;
 const DIRS = { up: 0, right: 1, down: 2, left: 3 };
 
 class Game {
+  tiles: any[];
+  score: number;
+  over: boolean;
+  _nextId: number;
+
   constructor() {
     this.reset();
   }

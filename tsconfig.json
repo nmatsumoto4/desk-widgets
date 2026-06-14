@@ -1,0 +1,39 @@
+{
+  "//": "レンダラ（ブラウザ/DOM）スクリプト用の型チェック設定。esbuild が実トランスパイルを行うため noEmit。",
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": []
+  },
+  "include": [
+    "src/globals.d.ts",
+    "src/sound.ts",
+    "src/game.ts",
+    "src/ai.ts",
+    "src/mod2048.ts",
+    "src/puyo.ts",
+    "src/puyo-ai.ts",
+    "src/mod-puyo.ts",
+    "src/rush.ts",
+    "src/mod-rush.ts",
+    "src/mod-invaders.ts",
+    "src/mod-bomber.ts",
+    "src/mod-tetris.ts",
+    "src/mod-snake.ts",
+    "src/mod-life.ts",
+    "src/mod-breakout.ts",
+    "src/mod-td.ts",
+    "src/app.ts"
+  ]
+}

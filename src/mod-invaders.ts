@@ -17,7 +17,7 @@ window.createWidgetInvaders = function (ctx) {
   const BESTLV_KEY = 'widgetInv.bestLevel';
 
   const wrapEl = document.getElementById('invaders');
-  const canvas = document.getElementById('invaders-canvas');
+  const canvas = document.getElementById('invaders-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
 
   const COLS = 6;
@@ -58,13 +58,13 @@ window.createWidgetInvaders = function (ctx) {
   let best = Number(localStorage.getItem(BEST_KEY) || 0);
   let bestLevel = Number(localStorage.getItem(BESTLV_KEY) || 1);
   let player = { x: FW / 2, dir: 0 };
-  let invaders = [];
+  let invaders: any[] = [];
   let swarmDir = 1;
-  let pBullets = [];
-  let iBullets = [];
+  let pBullets: any[] = [];
+  let iBullets: any[] = [];
   let state = 'play';        // play | waveclear | gameover
   let auto = false;
-  let timer = null;
+  let timer: any = null;
   let lastT = 0;
   let fireCd = 0;            // 自機ショットのクールダウン（秒）
   let enemyFireCd = 1;       // 敵発砲タイマー（秒）
@@ -73,7 +73,7 @@ window.createWidgetInvaders = function (ctx) {
   let restartCountdown = -1;
   let waveTicks = 0;
   let manualFire = false;
-  let particles = [];        // 撃破エフェクト
+  let particles: any[] = [];        // 撃破エフェクト
 
   function rand(n) { return Math.floor(Math.random() * n); }
   function burst(x, y, color) {
@@ -130,7 +130,7 @@ window.createWidgetInvaders = function (ctx) {
 
   // 各列の最前（最も下）の敵だけが撃てる
   function frontLine() {
-    const front = {};
+    const front: Record<string, any> = {};
     for (const v of invaders) {
       if (!v.alive) continue;
       if (!front[v.col] || v.y > front[v.col].y) front[v.col] = v;
@@ -235,14 +235,14 @@ window.createWidgetInvaders = function (ctx) {
     if (pBullets.length >= 4 || fireCd > 0) return;
     pBullets.push({ x: player.x + PLAYER_W / 2, y: PLAYER_Y - 1 });
     fireCd = 0.12;                 // 速射でなるべく早くクリア
-    if (window.SFX) SFX.shoot();
+    if (window.SFX) window.SFX.shoot();
   }
 
   function loseLife() {
     lives--;
     invuln = 1.2;
     iBullets = [];
-    if (window.SFX) SFX.explode();
+    if (window.SFX) window.SFX.explode();
     updateScores();
     if (lives <= 0) gameOver();
   }
@@ -330,7 +330,7 @@ window.createWidgetInvaders = function (ctx) {
         if (b.x >= v.x && b.x <= v.x + INV_W && b.y >= v.y && b.y <= v.y + INV_H) {
           v.alive = false;
           b.dead = true;
-          if (window.SFX) SFX.hit();
+          if (window.SFX) window.SFX.hit();
           burst(v.x + INV_W / 2, v.y + INV_H / 2, ROW_COLORS[v.row % ROW_COLORS.length]);
           score += 10 + (rowsForLevel(level) - 1 - v.row) * 5;
           updateScores();
@@ -356,7 +356,7 @@ window.createWidgetInvaders = function (ctx) {
     // ウェーブクリア判定
     if (state === 'play' && aliveInvaders().length === 0) {
       score += 100 * level;
-      if (window.SFX) SFX.levelup();
+      if (window.SFX) window.SFX.levelup();
       updateScores();
       state = 'waveclear';
       waveTicks = Math.round((auto ? 320 : 900) / TICK_MS); // 自動運転中は素早く次の面へ

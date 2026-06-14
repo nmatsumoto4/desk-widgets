@@ -10,7 +10,7 @@ window.SFX = (() => {
   function ensure() {
     if (ctx) return;
     try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       master = ctx.createGain();
       master.gain.value = 0.20;
       master.connect(ctx.destination);
@@ -19,7 +19,7 @@ window.SFX = (() => {
   function resumeIfNeeded() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
 
   // 単音（周波数スライド・波形指定可）
-  function tone(freq, dur, type, vol, slideTo) {
+  function tone(freq, dur, type, vol, slideTo?) {
     if (muted) return;
     ensure(); if (!ctx) return; resumeIfNeeded();
     const t = ctx.currentTime;

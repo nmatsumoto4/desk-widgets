@@ -112,11 +112,11 @@ window.createWidget2048 = function (ctx) {
       return;
     }
 
-    const dir = AI.bestMove(game.grid());
+    const dir = window.AI.bestMove(game.grid());
     if (dir) {
       const before = game.score;
       game.move(dir);
-      if (window.SFX && game.score > before) SFX.merge(game.maxTile());
+      if (window.SFX && game.score > before) window.SFX.merge(game.maxTile());
       render();
     } else {
       game.over = true;

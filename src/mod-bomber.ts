@@ -23,7 +23,7 @@ window.createWidgetBomber = function (ctx) {
   const ROUNDS_KEY = 'widgetBomber.rounds';
 
   const wrapEl = document.getElementById('bomber');
-  const canvas = document.getElementById('bomber-canvas');
+  const canvas = document.getElementById('bomber-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
   const ctrlEl = document.getElementById('bomber-ctrl');
   const densLabelEl = document.getElementById('bomber-dens-label');
@@ -53,21 +53,21 @@ window.createWidgetBomber = function (ctx) {
 
   const savedDens = localStorage.getItem(DENS_KEY);
   let densIdx = savedDens === null ? 2 : clampDens(Number(savedDens));
-  let grid = [];             // 0 空き / 1 ソフト / 2 壁
-  let players = [];
-  let bombs = [];
-  let flames = [];
-  let powerups = [];
+  let grid: number[][] = [];             // 0 空き / 1 ソフト / 2 壁
+  let players: any[] = [];
+  let bombs: any[] = [];
+  let flames: any[] = [];
+  let powerups: any[] = [];
   let state = 'play';        // play | roundover | gameover(未使用)
   let auto = false;
-  let timer = null;
+  let timer: any = null;
   let round = 0;
   let totalRounds = Number(localStorage.getItem(ROUNDS_KEY) || 0);
   let restartCountdown = -1;
   let roundTime = 0;
   let winnerText = '';
   let animClock = 0;        // 歩行アニメ用クロック（秒）
-  let spiral = [];          // サドンデスでブロックを積む順（外周→内側の渦巻き）
+  let spiral: any[] = [];          // サドンデスでブロックを積む順（外周→内側の渦巻き）
   let sdIndex = 0;          // 次に積むブロックの番号
   let sdAccum = 0;          // サドンデスのタイマー
   let sdInterval = 0.4;     // 1 ブロック積むごとの間隔（盤面サイズで自動調整）
@@ -209,7 +209,7 @@ window.createWidgetBomber = function (ctx) {
   }
 
   // 各マスが炎になるまでの最短時間（連鎖考慮）。安全なら Infinity
-  function dangerMap(extra) {
+  function dangerMap(extra?: any) {
     const list = extra ? bombs.concat([extra]) : bombs;
     const times = list.map((b) => b.fuse);
     const cover = list.map((b) => blastCells(b.r, b.c, b.power));
@@ -239,7 +239,7 @@ window.createWidgetBomber = function (ctx) {
     return v === undefined ? Infinity : v;
   };
 
-  const DIRS = [[-1, 0, 'up'], [1, 0, 'down'], [0, -1, 'left'], [0, 1, 'right']];
+  const DIRS: [number, number, string][] = [[-1, 0, 'up'], [1, 0, 'down'], [0, -1, 'left'], [0, 1, 'right']];
 
   // BFS：goal(r,c)==true の最寄りマスへの第一歩。通過は passable かつ差し迫った危険でないマス
   function bfsStep(sr, sc, goalFn, danger, minSafeT) {
@@ -348,7 +348,7 @@ window.createWidgetBomber = function (ctx) {
     const idx = bombs.indexOf(bomb);
     if (idx < 0) return;
     bombs.splice(idx, 1);
-    if (window.SFX) SFX.explode();
+    if (window.SFX) window.SFX.explode();
     const owner = players[bomb.owner];
     if (owner) owner.bombs = Math.max(0, owner.bombs - 1);
 
@@ -374,7 +374,7 @@ window.createWidgetBomber = function (ctx) {
   }
 
   function applyPowerup(pl, pu) {
-    if (window.SFX) SFX.item();
+    if (window.SFX) window.SFX.item();
     if (pu.type === 'bomb') pl.maxBombs = Math.min(6, pl.maxBombs + 1);
     else if (pu.type === 'fire') pl.power = Math.min(7, pl.power + 1);
     else if (pu.type === 'speed') pl.speed = Math.min(6, pl.speed + 0.6);

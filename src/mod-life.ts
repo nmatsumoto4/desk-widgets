@@ -14,14 +14,14 @@ window.createWidgetLife = function (ctx) {
   const BEST_KEY = 'widgetLife.peak';
 
   const wrapEl = document.getElementById('life');
-  const canvas = document.getElementById('life-canvas');
+  const canvas = document.getElementById('life-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
   const ctrlEl = document.getElementById('life-ctrl');
-  const presetSel = document.getElementById('life-preset');
+  const presetSel = document.getElementById('life-preset') as HTMLSelectElement;
 
   let COLS = 32, ROWS = 36;
-  let cell = [];             // Uint8 alive
-  let age = [];              // 生存世代数（色付け用）
+  let cell: any = [];             // Uint8 alive
+  let age: any = [];              // 生存世代数（色付け用）
   let generation = 0, population = 0, peak = Number(localStorage.getItem(BEST_KEY) || 0);
   let stall = 0;
   let hashPrev = 0, hashPrev2 = 0, cycleHits = 0; // 周期ループ検出用

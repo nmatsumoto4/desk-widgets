@@ -1,3 +1,7 @@
 node_modules/
 dist/
 .DS_Store
+
+# esbuild が src/*.ts から生成するビルド成果物（ルート出力の .js）。
+# 元ソースは src/*.ts。`npm run build` で再生成される。
+/*.js

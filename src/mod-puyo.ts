@@ -16,10 +16,10 @@ window.createWidgetPuyo = function (ctx) {
   const SPAWN_COL = Math.floor((W - 1) / 2);
 
   const wrapEl = document.getElementById('puyo');
-  const canvas = document.getElementById('puyo-canvas');
+  const canvas = document.getElementById('puyo-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
   const ctrlEl = document.getElementById('puyo-ctrl');
-  const replayBtn = document.getElementById('puyo-replay');
+  const replayBtn = document.getElementById('puyo-replay') as HTMLButtonElement;
 
   // 最大連鎖の盤面を読み込んで連鎖を再生する
   function playReplay() {
@@ -87,7 +87,7 @@ window.createWidgetPuyo = function (ctx) {
     g2d.globalAlpha = 1;
   }
 
-  let grid = Puyo.emptyGrid();
+  let grid = window.Puyo.emptyGrid();
   let queue = [rndPair(), rndPair()];
   let cur = null;          // 落下中ペア {colors:[軸,子], r, c, rot}
   let state = 'spawn';     // spawn | falling | check | popping
@@ -114,7 +114,7 @@ window.createWidgetPuyo = function (ctx) {
   let replaying = false;   // リプレイ再生中フラグ
 
   function rndPair() {
-    const r = () => 1 + Math.floor(Math.random() * Puyo.NUM_COLORS);
+    const r = () => 1 + Math.floor(Math.random() * window.Puyo.NUM_COLORS);
     return [r(), r()];
   }
 
@@ -188,7 +188,7 @@ window.createWidgetPuyo = function (ctx) {
     }
     cur = null;
     chainNum = 0;
-    if (window.SFX) SFX.land();
+    if (window.SFX) window.SFX.land();
     applyGravityAnimated();
     state = 'settle';
   }
@@ -202,7 +202,7 @@ window.createWidgetPuyo = function (ctx) {
   }
 
   function reset() {
-    grid = Puyo.emptyGrid();
+    grid = window.Puyo.emptyGrid();
     voff = makeVoff();
     vvel = makeVoff();
     queue = [rndPair(), rndPair()];
@@ -240,7 +240,7 @@ window.createWidgetPuyo = function (ctx) {
         if (grid[0][SPAWN_COL] !== 0 || grid[1][SPAWN_COL] !== 0) { gameOver(); break; }
         cur = { colors: queue.shift(), r: 1, c: SPAWN_COL, rot: 0 };
         queue.push(rndPair());
-        target = auto ? PuyoAI.bestPlacement(grid, cur.colors, maxChain) : null;
+        target = auto ? window.PuyoAI.bestPlacement(grid, cur.colors, maxChain) : null;
         gravCounter = 0;
         state = 'falling';
         break;
@@ -287,14 +287,14 @@ window.createWidgetPuyo = function (ctx) {
         break;
       }
       case 'check': {
-        const groups = Puyo.findGroups(grid);
+        const groups = window.Puyo.findGroups(grid);
         if (groups.length === 0) {
           if (replaying) { replaying = false; reset(); break; } // リプレイ後は新しくランダムに始め直す
           state = 'spawn';
         } else {
           if (chainNum === 0) chainSeed = grid.map((row) => row.slice()); // 連鎖開始盤面を記録
           chainNum++;
-          if (window.SFX) SFX.pop(chainNum);
+          if (window.SFX) window.SFX.pop(chainNum);
           chainLabelTicks = CHAIN_LABEL_TICKS;
           popping = groups.flat();
           popGain = popping.length * 10 *
@@ -461,7 +461,7 @@ window.createWidgetPuyo = function (ctx) {
       auto = on;
       if (on) {
         // 落下途中で AI に切替わったら、そこから最善手を再計算
-        if (state === 'falling' && cur) target = PuyoAI.bestPlacement(grid, cur.colors, maxChain);
+        if (state === 'falling' && cur) target = window.PuyoAI.bestPlacement(grid, cur.colors, maxChain);
       }
     },
     key(e) {

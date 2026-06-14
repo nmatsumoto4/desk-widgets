@@ -13,7 +13,7 @@ window.createWidgetTetris = function (ctx) {
   const BEST_KEY = 'widgetTetris.best';
 
   const wrapEl = document.getElementById('tetris');
-  const canvas = document.getElementById('tetris-canvas');
+  const canvas = document.getElementById('tetris-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
 
   // 各ピースの基準形（[r,c]）と色
@@ -100,9 +100,9 @@ window.createWidgetTetris = function (ctx) {
     if (full.length) {
       clearRows = full;
       clearTimer = CLEAR_TICKS;
-      if (window.SFX) SFX.clearLine();
+      if (window.SFX) window.SFX.clearLine();
     } else {
-      if (window.SFX) SFX.land();
+      if (window.SFX) window.SFX.land();
       spawn();
     }
   }

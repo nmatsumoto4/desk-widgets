@@ -78,28 +78,43 @@
 git clone https://github.com/nmatsumoto4/desk-widgets.git
 cd desk-widgets
 npm install
-npm start        # 起動
-npm run dist     # 配布用ビルド（dist/ に出力）
+npm start          # ビルド（esbuild）してから起動
+npm run build      # src/*.ts → ルートの *.js を生成
+npm run build:watch # 変更を監視して自動ビルド
+npm run typecheck  # tsc による型チェック（noEmit）
+npm run dist       # ビルドして配布用パッケージを出力（dist/）
 ```
+
+### TypeScript / ビルド
+
+ソースはすべて **TypeScript**（`src/*.ts`）です。`esbuild`（`build.mjs`）が各ファイルを
+個別トランスパイルし、`index.html` が読み込むルートの `*.js`（および `main.js` / `preload.js`）を生成します。
+生成された `*.js` はビルド成果物のため `.gitignore` 済みです（コミットするのは `src/*.ts`）。
+
+- レンダラ各スクリプトは ESM/CJS の import を使わず `window.*` グローバルで連携します（`src/globals.d.ts` に型定義）
+- 型チェックは `tsconfig.json`（レンダラ=DOM）と `tsconfig.main.json`（Electron メイン=Node）の2系統
+- 移行版のため `noImplicitAny` / `strictNullChecks` は緩和、その他の strict 検査は有効
 
 ### ファイル構成
 
 | ファイル | 役割 |
 |---|---|
-| `main.js` / `preload.js` | Electron メイン（ウィンドウ生成・整列・IPC） |
-| `index.html` / `style.css` / `app.js` | ゲームウィジェット共通シェル（モード切替・手動/AI 切替） |
-| `game.js` / `ai.js` / `mod2048.js` | 2048 ロジック / Expectimax AI / 描画 |
-| `puyo.js` / `puyo-ai.js` / `mod-puyo.js` | ぷよぷよ ロジック / 連鎖 AI / 描画 |
-| `rush.js` / `mod-rush.js` | Rush Hour ロジック・BFS ソルバー・問題生成 / 描画 |
-| `mod-invaders.js` | インベーダー（ゲーム進行・回避/掃討 AI・レベル管理・描画） |
-| `mod-bomber.js` | ボンバーマン（4 体 AI 対戦・爆風危険マップ/退避 AI・ブロック調整・描画） |
-| `mod-tetris.js` | テトリス（配置評価 AI・レベル/落下速度・ゴースト/NEXT・描画） |
-| `mod-snake.js` | スネーク（最短路＋空間確保 AI・可変大グリッド・ドット絵描画） |
-| `mod-life.js` | ライフゲーム（トーラス B3/S23・停滞検出ランダム注入・有名プリセット・ドット絵） |
-| `mod-breakout.js` | ブロック崩し（受け/狙い撃ち AI・可変グリッド・アイテム・モダン演出） |
-| `mod-td.js` | タワーディフェンス（8 種兵器・蛇行路生成・構成比/要所優先の建設 AI・ウェーブ難化・ドット絵） |
+| `build.mjs` / `tsconfig*.json` | esbuild ビルドスクリプト / 型チェック設定 |
+| `src/main.ts` / `src/preload.ts` | Electron メイン（ウィンドウ生成・整列・IPC） |
+| `src/globals.d.ts` | `window.*` グローバルと共通インターフェース（`WidgetCtx` / `WidgetModule`）の型定義 |
+| `index.html` / `style.css` / `src/app.ts` | ゲームウィジェット共通シェル（モード切替・手動/AI 切替） |
+| `src/game.ts` / `src/ai.ts` / `src/mod2048.ts` | 2048 ロジック / Expectimax AI / 描画 |
+| `src/puyo.ts` / `src/puyo-ai.ts` / `src/mod-puyo.ts` | ぷよぷよ ロジック / 連鎖 AI / 描画 |
+| `src/rush.ts` / `src/mod-rush.ts` | Rush Hour ロジック・BFS ソルバー・問題生成 / 描画 |
+| `src/mod-invaders.ts` | インベーダー（ゲーム進行・回避/掃討 AI・レベル管理・描画） |
+| `src/mod-bomber.ts` | ボンバーマン（4 体 AI 対戦・爆風危険マップ/退避 AI・ブロック調整・描画） |
+| `src/mod-tetris.ts` | テトリス（配置評価 AI・レベル/落下速度・ゴースト/NEXT・描画） |
+| `src/mod-snake.ts` | スネーク（最短路＋空間確保 AI・可変大グリッド・ドット絵描画） |
+| `src/mod-life.ts` | ライフゲーム（トーラス B3/S23・停滞検出ランダム注入・有名プリセット・ドット絵） |
+| `src/mod-breakout.ts` | ブロック崩し（受け/狙い撃ち AI・可変グリッド・アイテム・モダン演出） |
+| `src/mod-td.ts` | タワーディフェンス（8 種兵器・蛇行路生成・構成比/要所優先の建設 AI・ウェーブ難化・ドット絵） |
 
-新しいゲームは `show/hide/setAuto/key/relayout` の共通インターフェースに載せるだけで追加できます。
+新しいゲームは `show/hide/setAuto/key/relayout` の共通インターフェース（`WidgetModule`）に載せるだけで追加できます。
 
 ## License
 

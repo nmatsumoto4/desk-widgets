@@ -12,7 +12,7 @@ window.createWidgetTD = function (ctx) {
   const BEST_KEY = 'widgetTD.bestWave';
 
   const wrapEl = document.getElementById('td');
-  const canvas = document.getElementById('td-canvas');
+  const canvas = document.getElementById('td-canvas') as HTMLCanvasElement;
   const g2d = canvas.getContext('2d');
 
   // 兵器（タワー）の種類

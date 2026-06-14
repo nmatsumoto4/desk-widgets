@@ -1,5 +1,6 @@
-const { app, BrowserWindow, screen, ipcMain, globalShortcut, Tray, Menu, nativeImage } = require('electron');
-const path = require('path');
+import { app, BrowserWindow, screen, ipcMain, globalShortcut, Tray, Menu, nativeImage } from 'electron';
+import type { BrowserWindow as BrowserWindowType } from 'electron';
+import * as path from 'path';
 
 const APP_NAME = 'THE RETRO CENTER';
 app.setName(APP_NAME);
@@ -25,7 +26,7 @@ function setLayer(top) {
 }
 function toggleLayer() { setLayer(!onTop); }
 
-function createWindow(mode) {
+function createWindow(mode?: string) {
   const { workArea } = screen.getPrimaryDisplay();
   const idx = windowCount++;
   const col = idx % PER_ROW;
