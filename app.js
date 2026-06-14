@@ -74,7 +74,7 @@
     manual = m;
     document.body.classList.toggle('focused', m);
     active.setAuto(!m);
-    modeIndicatorEl.textContent = m ? '手動モード（クリックで AI 再開）' : 'AI 自動運転中';
+    modeIndicatorEl.textContent = m ? '手動モード（Space / クリックで AI 再開）' : 'AI 自動運転中';
     modeIndicatorEl.classList.toggle('manual', m);
   }
 
@@ -122,9 +122,15 @@
   window.addEventListener('keydown', (e) => {
     // セレクトボックス操作中はキーをゲームに奪わせない
     if (document.activeElement === modeSelectEl) return;
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) return;
+    // Space は「AI モード再開」に統一（手動操作中に押すと自動運転へ戻る）
+    if (e.key === ' ') {
+      e.preventDefault();
+      if (manual) setManual(false);
+      return;
+    }
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
     e.preventDefault();
-    // フォーカス中に矢印キーを押したら（AI 再開ボタン押下後でも）手動に戻す
+    // 矢印キーを押したら手動モードに（フォーカス中のみ届く）
     if (!manual) setManual(true);
     active.key(e);
   });

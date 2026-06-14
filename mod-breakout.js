@@ -9,8 +9,18 @@ window.createWidgetBreakout = function (ctx) {
   const FW = 100, FH = 134;
   const TICK_MS = 16;            // ≈60fps（なめらかなボール）
   const RESTART_TICKS = Math.round(1500 / TICK_MS);
-  const RANDOM_FROM = 5;         // このレベル以降はランダムステージ
-  const COLS = 9;
+  const RANDOM_FROM = 6;         // このレベル以降はランダムステージ混在
+  // 王道ブロック崩しのステージ型（alive 判定）。低レベルは順番に、高レベルはランダム
+  const PATTERNS = [
+    (r, c, R, C) => true,                                            // 全面
+    (r, c, R, C) => Math.abs(c - (C - 1) / 2) <= (R - 1 - r) + 0.5,  // ピラミッド
+    (r, c, R, C) => (r + c) % 2 === 0,                               // 市松
+    (r, c, R, C) => c % 2 === 0 || r === 0,                          // 縦縞＋天井
+    (r, c, R, C) => { const cx = (C - 1) / 2, cy = (R - 1) / 2; return Math.abs(c - cx) + Math.abs(r - cy) <= Math.max(cx, cy) + 0.5; }, // ダイヤ
+    (r, c, R, C) => r % 2 === 0 || c === 0 || c === C - 1,           // 横縞＋側壁
+    (r, c, R, C) => r === 0 || r === R - 1 || c === 0 || c === C - 1 || (r + c) % 2 === 0 // 砦
+  ];
+  let cols = 9, rows = 3;
   const START_KEY = 'widgetBreakout.startLevel';
   const BEST_KEY = 'widgetBreakout.best';
 
@@ -32,13 +42,13 @@ window.createWidgetBreakout = function (ctx) {
   let restartCountdown = -1, levelupTicks = 0, slowTimer = 0;
   let flash = 0;                // 画面フラッシュ（被弾/レベルアップ）
   let aimT = 0;                 // AI が受ける位置を振るための位相
+  let noBreak = 0;              // 壊せるブロックを崩していない経過秒（停滞検出）
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   function ballSpeed() { return Math.min(165, 60 + level * 4.5); }
   function paddleSpeed() { return 72 + level * 2.6; }
-  function rowsForLevel(lv) { return Math.min(3 + Math.floor(lv / 2), 7); }
 
   function spawnBall(onPaddle) {
     const sp = ballSpeed();
@@ -53,29 +63,33 @@ window.createWidgetBreakout = function (ctx) {
 
   function buildLevel() {
     bricks = []; items = []; particles = [];
-    const rows = rowsForLevel(level);
-    const gap = 0.8;
-    const bw = (FW - 6) / COLS;
-    const bh = 4.2;
-    const top = 10;
-    const maxHp = Math.min(3, 1 + Math.floor(level / 4));
+    // レベルが上がるほどマス（列・行）が増える
+    cols = clamp(8 + Math.floor(level / 3), 8, 13);
+    rows = clamp(3 + Math.floor(level / 2), 3, 9);
+    const gap = 0.6, bw = (FW - 6) / cols, bh = 3.6, top = 9;
+    // 硬いブロック・鋼鉄（壊せない）の出現率がレベルで増える
+    const toughChance = clamp((level - 1) * 0.045, 0, 0.35);
+    const steelChance = level >= 4 ? clamp((level - 3) * 0.02, 0, 0.1) : 0;
+    const maxHp = Math.min(3, 1 + Math.floor(level / 5));
+    // ステージ型を選択（低レベルは順番／高レベルはランダム or ランダムソウプ）
+    let pat;
+    if (level < RANDOM_FROM) pat = PATTERNS[(level - 1) % PATTERNS.length];
+    else pat = Math.random() < 0.55 ? PATTERNS[Math.floor(Math.random() * PATTERNS.length)] : (() => Math.random() < 0.72);
+
     for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < COLS; c++) {
-        let alive = true, hp = 1;
-        if (level >= RANDOM_FROM) {
-          alive = Math.random() < 0.68;
-          hp = 1 + (Math.random() < (level - RANDOM_FROM + 1) * 0.08 ? Math.floor(rnd(1, maxHp + 1)) : 0);
-        } else {
-          hp = (level >= 3 && r === 0) ? 2 : 1;
-        }
-        if (!alive) continue;
+      for (let c = 0; c < cols; c++) {
+        if (!pat(r, c, rows, cols)) continue;
+        let hp = 1, steel = false;
+        const q = Math.random();
+        if (steelChance && q < steelChance && r < rows - 1) steel = true;      // 鋼鉄（下端以外）
+        else if (q < steelChance + toughChance) hp = 1 + Math.floor(rnd(1, maxHp + 1)); // 硬い（複数回）
         bricks.push({
           x: 3 + c * bw, y: top + r * (bh + gap), w: bw - gap, h: bh,
-          hp, maxhp: hp, hue: (r * 40 + 200) % 360
+          hp, maxhp: hp, steel, hue: (r * 36 + 200) % 360
         });
       }
     }
-    if (bricks.length < 6) buildLevel(); // 少なすぎたら作り直し
+    if (!bricks.some((b) => !b.steel)) buildLevel(); // 壊せる物が無ければ作り直し
   }
 
   function startLevelPlay(resetLives) {
@@ -172,8 +186,10 @@ window.createWidgetBreakout = function (ctx) {
         const ox = Math.min(b.x + b.r - br.x, br.x + br.w - (b.x - b.r));
         const oy = Math.min(b.y + b.r - br.y, br.y + br.h - (b.y - b.r));
         if (ox < oy) b.vx = -b.vx; else b.vy = -b.vy;
+        if (br.steel) break;       // 壊せない（反射のみ）
         br.hp--;
         score += 10 * level;
+        noBreak = 0;               // 崩した＝停滞解除
         if (br.hp <= 0) {
           burst(br.x + br.w / 2, br.y + br.h / 2, br.hue);
           maybeDropItem(br.x + br.w / 2, br.y + br.h / 2);
@@ -181,6 +197,13 @@ window.createWidgetBreakout = function (ctx) {
         updateScores();
         break;
       }
+      // 停滞防止：水平・垂直に寄りすぎたら最低限の速度を確保（無限往復を回避）
+      const sp = Math.hypot(b.vx, b.vy) || ballSpeed();
+      const minVy = sp * 0.34, minVx = sp * 0.12;
+      if (Math.abs(b.vy) < minVy) b.vy = (b.vy >= 0 ? 1 : -1) * minVy;
+      if (Math.abs(b.vx) < minVx) b.vx = (b.vx >= 0 ? 1 : -1) * minVx;
+      const k = sp / (Math.hypot(b.vx, b.vy) || 1);
+      b.vx *= k; b.vy *= k;
     }
     b.trail.push({ x: b.x, y: b.y });
     if (b.trail.length > 7) b.trail.shift();
@@ -204,13 +227,20 @@ window.createWidgetBreakout = function (ctx) {
 
     // パドル（AI / 手動）
     if (auto) {
+      // 最も下にあるボールを常に追う（上昇中でも現在 x を追って待機しない）
       let best = null, bestY = -1;
-      for (const b of balls) if (b.vy > 0 && b.y > bestY) { bestY = b.y; best = b; }
+      for (const b of balls) if (b.y > bestY) { bestY = b.y; best = b; }
       let tgt = paddle.x;
       if (best) {
-        // 受ける位置を中央から振って跳ね返り角を散らす（縦トンネル防止）
-        const off = 0.6 * Math.sin(aimT);
-        tgt = predictX(best) - off * (paddle.w / 2);
+        if (best.vy > 0) {
+          const land = predictX(best);
+          const tb = aimBrickX(land);                  // 狙う残ブロックの x
+          // ブロックへ向けて角度をつける（無ければ軽く振る）。常に崩しに行く
+          const off = tb != null ? clamp((tb - land) / 12, -0.7, 0.7) : 0.6 * Math.sin(aimT);
+          tgt = land - off * (paddle.w / 2);
+        } else {
+          tgt = best.x; // 上昇中はボール直下で待機しない＝追従
+        }
       }
       aimT += dt * 1.7;
       const sp = paddleSpeed();
@@ -218,7 +248,10 @@ window.createWidgetBreakout = function (ctx) {
     }
     paddle.x = clamp(paddle.x, paddle.w / 2, FW - paddle.w / 2);
 
+    noBreak += dt;
     for (const b of balls) moveBall(b, bdt);
+    // 長時間どのブロックも崩していない＝袋小路 → 全ボールを最寄りの壊せるブロックへ向ける
+    if (noBreak > 4) { steerToBricks(); noBreak = 0; }
     balls = balls.filter((b) => b.y - b.r < FH);
     if (balls.length === 0) {
       lives--;
@@ -241,14 +274,43 @@ window.createWidgetBreakout = function (ctx) {
     for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 60 * dt; p.life -= dt; }
     particles = particles.filter((p) => p.life > 0);
 
-    // クリア判定
-    if (bricks.every((br) => br.hp <= 0)) {
+    // クリア判定（鋼鉄は無視）
+    if (bricks.every((br) => br.steel || br.hp <= 0)) {
       state = 'levelup';
       levelupTicks = Math.round(900 / TICK_MS);
       flash = 1;
       ctx.showOverlay(`LEVEL ${level + 1}`, 'クリア！');
     }
     render();
+  }
+
+  // 全ボールを最寄りの壊せるブロックへ向ける（袋小路からの脱出）
+  function steerToBricks() {
+    for (const b of balls) {
+      let tx = null, ty = null, bs = -Infinity;
+      for (const br of bricks) {
+        if (br.steel || br.hp <= 0) continue;
+        const cx = br.x + br.w / 2, cy = br.y + br.h / 2;
+        const s = -Math.hypot(cx - b.x, cy - b.y);
+        if (s > bs) { bs = s; tx = cx; ty = cy; }
+      }
+      if (tx == null) continue;
+      const sp = Math.hypot(b.vx, b.vy) || ballSpeed();
+      const dx = tx - b.x, dy = ty - b.y, d = Math.hypot(dx, dy) || 1;
+      b.vx = dx / d * sp; b.vy = dy / d * sp;
+    }
+  }
+
+  // 狙うべき残ブロック（壊せるもの）の中心 x。最下段かつ近いものを優先
+  function aimBrickX(fromX) {
+    let bestX = null, bestScore = -Infinity;
+    for (const br of bricks) {
+      if (br.steel || br.hp <= 0) continue;
+      const cx = br.x + br.w / 2;
+      const s = br.y * 2 - Math.abs(cx - fromX); // 下にある・近いほど高評価
+      if (s > bestScore) { bestScore = s; bestX = cx; }
+    }
+    return bestX;
   }
 
   function predictX(b) {
@@ -305,13 +367,35 @@ window.createWidgetBreakout = function (ctx) {
 
     // ブロック
     for (const br of bricks) {
-      if (br.hp <= 0) continue;
-      const dim = br.hp < br.maxhp ? 38 : 52;
-      g2d.fillStyle = `hsl(${br.hue},70%,${dim}%)`;
-      roundRect(sx(br.x), sy(br.y), br.w * scale, br.h * scale, scale * 0.8);
-      g2d.fill();
-      g2d.fillStyle = 'rgba(255,255,255,0.22)';
-      g2d.fillRect(sx(br.x) + scale * 0.4, sy(br.y) + scale * 0.4, (br.w - 0.8) * scale, br.h * scale * 0.28);
+      if (!br.steel && br.hp <= 0) continue;
+      const bx = sx(br.x), by = sy(br.y), bwp = br.w * scale, bhp = br.h * scale;
+      if (br.steel) {
+        // 鋼鉄（壊せない）：グレー＋四隅リベット
+        g2d.fillStyle = '#9aa3ad';
+        roundRect(bx, by, bwp, bhp, scale * 0.7); g2d.fill();
+        g2d.fillStyle = 'rgba(255,255,255,0.28)';
+        g2d.fillRect(bx + scale * 0.4, by + scale * 0.4, bwp - scale * 0.8, bhp * 0.26);
+        g2d.fillStyle = 'rgba(0,0,0,0.35)';
+        for (const [dx, dy] of [[0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8]]) {
+          g2d.beginPath(); g2d.arc(bx + bwp * dx, by + bhp * dy, scale * 0.35, 0, Math.PI * 2); g2d.fill();
+        }
+      } else {
+        const tough = br.maxhp >= 2;
+        const sat = tough ? 38 : 70;
+        const lum = tough ? 60 - (br.maxhp - br.hp) * 10 : 52;
+        g2d.fillStyle = `hsl(${br.hue},${sat}%,${lum}%)`;
+        roundRect(bx, by, bwp, bhp, scale * 0.8); g2d.fill();
+        g2d.fillStyle = 'rgba(255,255,255,0.22)';
+        g2d.fillRect(bx + scale * 0.4, by + scale * 0.4, bwp - scale * 0.8, bhp * 0.28);
+        // 硬いブロックがダメージを受けたらヒビ
+        if (tough && br.hp < br.maxhp) {
+          g2d.strokeStyle = 'rgba(0,0,0,0.5)';
+          g2d.lineWidth = Math.max(1, scale * 0.18);
+          g2d.beginPath();
+          g2d.moveTo(bx + bwp * 0.5, by); g2d.lineTo(bx + bwp * 0.38, by + bhp * 0.55); g2d.lineTo(bx + bwp * 0.6, by + bhp);
+          g2d.stroke();
+        }
+      }
     }
 
     // パーティクル
