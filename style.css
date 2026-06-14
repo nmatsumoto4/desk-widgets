@@ -189,6 +189,19 @@ html, body {
   border-radius: 6px;
 }
 
+/* テトリス・スネーク盤面 */
+#tetris, #snake {
+  display: none;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: center;
+}
+
+#tetris-canvas, #snake-canvas {
+  border-radius: 6px;
+}
+
 /* ボンバーマンのブロック量コントロール（bomber モード時のみ表示） */
 #bomber-ctrl {
   display: none;

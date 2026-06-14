@@ -4,9 +4,9 @@
 
 (() => {
   const MODE_KEY = 'widget.mode';
-  const MODE_ORDER = ['2048', 'puyo', 'rush', 'invaders', 'bomber'];
-  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー', bomber: 'ボンバーマン' };
-  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV', bomber: 'ボム' };
+  const MODE_ORDER = ['2048', 'puyo', 'rush', 'invaders', 'bomber', 'tetris', 'snake'];
+  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー', bomber: 'ボンバーマン', tetris: 'テトリス', snake: 'スネーク' };
+  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV', bomber: 'ボム', tetris: 'テト', snake: 'スネク' };
 
   const titleEl = document.getElementById('title');
   const scoreEl = document.getElementById('score');
@@ -41,7 +41,9 @@
     puyo: window.createWidgetPuyo(ctx),
     rush: window.createWidgetRush(ctx),
     invaders: window.createWidgetInvaders(ctx),
-    bomber: window.createWidgetBomber(ctx)
+    bomber: window.createWidgetBomber(ctx),
+    tetris: window.createWidgetTetris(ctx),
+    snake: window.createWidgetSnake(ctx)
   };
 
   // 起動モード：URL パラメータ > 前回の選択 > 2048
