@@ -44,6 +44,7 @@ window.createWidgetBreakout = function (ctx) {
   let aimT = 0;                 // AI が受ける位置を振るための位相
   let noBreak = 0;              // 壊せるブロックを崩していない経過秒（停滞検出）
   let steerTimer = 0;          // 再ステアの間隔タイマー
+  let clock = 0;               // 演出用クロック（アイテムの脈動など）
 
   const rnd = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -64,10 +65,10 @@ window.createWidgetBreakout = function (ctx) {
 
   function buildLevel() {
     bricks = []; items = []; particles = [];
-    // レベルが上がるほどマス（列・行）が増える
-    cols = clamp(8 + Math.floor(level / 3), 8, 13);
-    rows = clamp(3 + Math.floor(level / 2), 3, 9);
-    const gap = 0.6, bw = (FW - 6) / cols, bh = 3.6, top = 9;
+    // レベルが上がるほどマス（列・行）が増える（細かめ）
+    cols = clamp(11 + Math.floor(level / 2), 11, 18);
+    rows = clamp(4 + Math.floor(level / 2), 4, 12);
+    const gap = 0.5, bw = (FW - 4) / cols, bh = 3.0, top = 8;
     // 硬いブロック・鋼鉄（壊せない）の出現率がレベルで増える
     const toughChance = clamp((level - 1) * 0.045, 0, 0.35);
     const steelChance = level >= 4 ? clamp((level - 3) * 0.02, 0, 0.1) : 0;
@@ -85,8 +86,8 @@ window.createWidgetBreakout = function (ctx) {
         if (steelChance && q < steelChance && r < rows - 1) steel = true;      // 鋼鉄（下端以外）
         else if (q < steelChance + toughChance) hp = 1 + Math.floor(rnd(1, maxHp + 1)); // 硬い（複数回）
         bricks.push({
-          x: 3 + c * bw, y: top + r * (bh + gap), w: bw - gap, h: bh,
-          hp, maxhp: hp, steel, hue: (r * 36 + 200) % 360
+          x: 2 + c * bw, y: top + r * (bh + gap), w: bw - gap, h: bh,
+          hp, maxhp: hp, steel, hue: (r * 30 + 200) % 360
         });
       }
     }
@@ -129,11 +130,15 @@ window.createWidgetBreakout = function (ctx) {
     { t: 'slow', w: 18, col: '#9b59b6', ch: 'S' }
   ];
   function maybeDropItem(x, y) {
-    if (Math.random() > 0.14) return;
+    if (Math.random() > 0.30) return;            // 比較的たくさん出す
     const total = ITEMS.reduce((a, i) => a + i.w, 0);
     let r = Math.random() * total, pick = ITEMS[0];
     for (const it of ITEMS) { if ((r -= it.w) <= 0) { pick = it; break; } }
-    items.push({ x, y, vy: 30, type: pick.t, col: pick.col, ch: pick.ch });
+    items.push({ x, y, vy: 26, type: pick.t, col: pick.col, ch: pick.ch, spin: rnd(0, 6.28) });
+  }
+  function darken(hex, f) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgb(${Math.round((n >> 16 & 255) * f)},${Math.round((n >> 8 & 255) * f)},${Math.round((n & 255) * f)})`;
   }
   function applyItem(type) {
     flash = 1;
@@ -218,6 +223,7 @@ window.createWidgetBreakout = function (ctx) {
 
   function tick() {
     const dt = TICK_MS / 1000;
+    clock += dt;
     if (flash > 0) flash = Math.max(0, flash - dt * 3);
 
     if (state === 'gameover') {
@@ -433,19 +439,33 @@ window.createWidgetBreakout = function (ctx) {
     }
     g2d.globalAlpha = 1;
 
-    // アイテム（グロー）
+    // アイテム（光る宝石風：グラデ＋グロー＋脈動＋きらめき）
     for (const it of items) {
+      const cx = sx(it.x), cy = sy(it.y);
+      const pulse = 1 + 0.14 * Math.sin(clock * 9 + it.spin);
+      const w = scale * 5.2 * pulse, h = scale * 3.4 * pulse;
       g2d.save();
-      g2d.shadowColor = it.col; g2d.shadowBlur = scale * 2.5;
-      g2d.fillStyle = it.col;
-      roundRect(sx(it.x) - scale * 2.2, sy(it.y) - scale * 1.6, scale * 4.4, scale * 3.2, scale * 0.8);
-      g2d.fill();
+      g2d.shadowColor = it.col; g2d.shadowBlur = scale * 4 * pulse;
+      const grad = g2d.createLinearGradient(0, cy - h / 2, 0, cy + h / 2);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.35, it.col);
+      grad.addColorStop(1, darken(it.col, 0.55));
+      g2d.fillStyle = grad;
+      roundRect(cx - w / 2, cy - h / 2, w, h, scale * 1.1); g2d.fill();
       g2d.restore();
-      g2d.fillStyle = '#fff';
-      g2d.font = `bold ${Math.floor(scale * 2.4)}px sans-serif`;
+      // ふち
+      g2d.strokeStyle = 'rgba(255,255,255,0.85)';
+      g2d.lineWidth = Math.max(1, scale * 0.22);
+      roundRect(cx - w / 2, cy - h / 2, w, h, scale * 1.1); g2d.stroke();
+      // 文字
+      g2d.fillStyle = '#15151a';
+      g2d.font = `bold ${Math.floor(scale * 2.3)}px sans-serif`;
       g2d.textAlign = 'center'; g2d.textBaseline = 'middle';
-      g2d.fillText(it.ch, sx(it.x), sy(it.y) + scale * 0.1);
+      g2d.fillText(it.ch, cx, cy + scale * 0.1);
       g2d.textAlign = 'left'; g2d.textBaseline = 'alphabetic';
+      // きらめき
+      g2d.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * Math.sin(clock * 12 + it.spin)})`;
+      g2d.fillRect(cx + w * 0.28, cy - h * 0.3, scale * 0.5, scale * 0.5);
     }
 
     // パドル（グロー）

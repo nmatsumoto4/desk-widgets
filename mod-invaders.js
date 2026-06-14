@@ -225,9 +225,9 @@ window.createWidgetInvaders = function (ctx) {
   }
 
   function shoot() {
-    if (pBullets.length >= 3 || fireCd > 0) return;
+    if (pBullets.length >= 4 || fireCd > 0) return;
     pBullets.push({ x: player.x + PLAYER_W / 2, y: PLAYER_Y - 1 });
-    fireCd = 0.18;
+    fireCd = 0.12;                 // 速射でなるべく早くクリア
     if (window.SFX) SFX.shoot();
   }
 
@@ -249,7 +249,8 @@ window.createWidgetInvaders = function (ctx) {
   // ---- 更新 ----
   function tick() {
     const now = (lastT || 0) + TICK_MS;
-    const dt = TICK_MS / 1000;
+    // AI 自動運転中はゲーム全体をスピードアップ（早くクリアして次の面へ）
+    const dt = TICK_MS / 1000 * (auto ? 1.9 : 1);
     lastT = now;
     animT += dt;
 
@@ -348,7 +349,7 @@ window.createWidgetInvaders = function (ctx) {
       if (window.SFX) SFX.levelup();
       updateScores();
       state = 'waveclear';
-      waveTicks = Math.round(900 / TICK_MS);
+      waveTicks = Math.round((auto ? 320 : 900) / TICK_MS); // 自動運転中は素早く次の面へ
       ctx.showOverlay(`LEVEL ${level + 1}`, 'ウェーブクリア！');
     }
 

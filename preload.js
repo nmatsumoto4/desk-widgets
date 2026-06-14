@@ -10,5 +10,9 @@ contextBridge.exposeInMainWorld('widgetAPI', {
   // 前面/背面の切替
   toggleLayer: () => ipcRenderer.send('toggle-layer'),
   setLayer: (top) => ipcRenderer.send('set-layer', top),
-  layerOnTop: () => ipcRenderer.invoke('layer-on-top')
+  layerOnTop: () => ipcRenderer.invoke('layer-on-top'),
+  // 一括ミュート
+  toggleMute: () => ipcRenderer.send('toggle-mute'),
+  getMuted: () => ipcRenderer.invoke('get-muted'),
+  onMutedChanged: (cb) => ipcRenderer.on('muted-changed', (_e, m) => cb(m))
 });

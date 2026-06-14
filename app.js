@@ -111,7 +111,15 @@
 
   const muteBtn = document.getElementById('mute-btn');
   function refreshMute() { muteBtn.textContent = window.SFX && window.SFX.isMuted() ? '🔇' : '🔊'; }
-  muteBtn.addEventListener('click', () => { if (window.SFX) { window.SFX.toggle(); refreshMute(); } });
+  muteBtn.addEventListener('click', () => {
+    if (window.widgetAPI) window.widgetAPI.toggleMute();   // 全ウィジェット一括
+    else if (window.SFX) { window.SFX.toggle(); refreshMute(); }
+  });
+  if (window.widgetAPI) {
+    // メイン管理の一括ミュート状態に同期
+    window.widgetAPI.onMutedChanged((m) => { if (window.SFX) window.SFX.setMuted(m); refreshMute(); });
+    window.widgetAPI.getMuted().then((m) => { if (window.SFX) window.SFX.setMuted(m); refreshMute(); });
+  }
   refreshMute();
 
   closeBtn.addEventListener('click', () => window.close());

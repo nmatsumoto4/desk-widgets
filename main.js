@@ -80,12 +80,26 @@ function createWindow(mode) {
   win.once('ready-to-show', () => win.showInactive());
 }
 
-// すべてのウィジェットを一括で隠す／再表示する
+// 一括ミュート（全ウィジェットへ通知）
+let muted = false;
+let savedMute = false; // 非表示前のミュート状態（復帰用）
+function setMuted(m) {
+  muted = !!m;
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { w.webContents.send('muted-changed', muted); } catch (e) {}
+  }
+  if (tray) tray.setContextMenu(buildTrayMenu());
+}
+function toggleMute() { setMuted(!muted); }
+
+// すべてのウィジェットを一括で隠す／再表示する（非表示中は自動でミュート）
 function setAllVisible(visible) {
+  if (!visible) savedMute = muted;
   for (const w of BrowserWindow.getAllWindows()) {
     if (visible) w.showInactive();
     else w.hide();
   }
+  setMuted(visible ? savedMute : true);
 }
 function toggleHideAll() {
   const wins = BrowserWindow.getAllWindows();
@@ -151,6 +165,8 @@ function buildTrayMenu() {
     { label: onTop ? '✓ 前面に表示' : '前面に表示', click: () => setLayer(true) },
     { label: !onTop ? '✓ 背面に表示（デスクトップ寄り）' : '背面に表示（デスクトップ寄り）', click: () => setLayer(false) },
     { type: 'separator' },
+    { label: muted ? '🔇 ミュート中（解除）' : '🔊 効果音 ON（ミュート）', click: toggleMute },
+    { type: 'separator' },
     { label: '新しいウィジェットを追加', click: () => createWindow() },
     { type: 'separator' },
     { label: '終了', click: () => app.quit() }
@@ -166,6 +182,7 @@ function registerShortcut(cands, fn, label) {
 function registerShortcuts() {
   registerShortcut(['CommandOrControl+Shift+H', 'CommandOrControl+Alt+H', 'CommandOrControl+Shift+0'], toggleHideAll, 'hide-all');
   registerShortcut(['CommandOrControl+Shift+B', 'CommandOrControl+Alt+B', 'CommandOrControl+Shift+9'], toggleLayer, 'layer');
+  registerShortcut(['CommandOrControl+Shift+M', 'CommandOrControl+Alt+M', 'CommandOrControl+Shift+8'], toggleMute, 'mute');
 }
 
 app.whenReady().then(() => {
@@ -186,6 +203,9 @@ ipcMain.on('toggle-hide-all', () => toggleHideAll());
 ipcMain.on('toggle-layer', () => toggleLayer());
 ipcMain.on('set-layer', (_e, top) => setLayer(!!top));
 ipcMain.handle('layer-on-top', () => onTop);
+// 一括ミュートの切替・取得
+ipcMain.on('toggle-mute', () => toggleMute());
+ipcMain.handle('get-muted', () => muted);
 // テスト・確認用：表示中ウィンドウ数
 ipcMain.handle('widgets-visible-count', () => BrowserWindow.getAllWindows().filter((w) => w.isVisible()).length);
 

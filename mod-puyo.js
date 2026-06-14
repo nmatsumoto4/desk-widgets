@@ -289,7 +289,7 @@ window.createWidgetPuyo = function (ctx) {
       case 'check': {
         const groups = Puyo.findGroups(grid);
         if (groups.length === 0) {
-          if (replaying) replaying = false; // リプレイ終了 → 通常へ
+          if (replaying) { replaying = false; reset(); break; } // リプレイ後は新しくランダムに始め直す
           state = 'spawn';
         } else {
           if (chainNum === 0) chainSeed = grid.map((row) => row.slice()); // 連鎖開始盤面を記録
