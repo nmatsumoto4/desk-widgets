@@ -35,6 +35,7 @@
       <div id="bomber"><canvas id="bomber-canvas"></canvas></div>
       <div id="tetris"><canvas id="tetris-canvas"></canvas></div>
       <div id="snake"><canvas id="snake-canvas"></canvas></div>
+      <div id="life"><canvas id="life-canvas"></canvas></div>
       <div id="overlay">
         <span id="overlay-title"></span>
         <span id="overlay-sub"></span>
@@ -53,6 +54,9 @@
         <span id="bomber-dens-label"></span>
         <button id="bomber-plus" title="ブロックを増やす">＋</button>
       </span>
+      <span id="life-ctrl">
+        <select id="life-preset" title="プリセットを選択"></select>
+      </span>
       <span id="games-count"></span>
     </footer>
   </div>
@@ -69,6 +73,7 @@
   <script src="mod-bomber.js"></script>
   <script src="mod-tetris.js"></script>
   <script src="mod-snake.js"></script>
+  <script src="mod-life.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

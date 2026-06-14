@@ -202,8 +202,8 @@ html, body {
   border-radius: 6px;
 }
 
-/* テトリス・スネーク盤面 */
-#tetris, #snake {
+/* テトリス・スネーク・ライフゲーム盤面 */
+#tetris, #snake, #life {
   display: none;
   width: 100%;
   height: 100%;
@@ -211,8 +211,25 @@ html, body {
   justify-content: center;
 }
 
-#tetris-canvas, #snake-canvas {
+#tetris-canvas, #snake-canvas, #life-canvas {
   border-radius: 6px;
+}
+
+/* ライフゲームのプリセット選択（life モード時のみ表示） */
+#life-ctrl {
+  display: none;
+  align-items: center;
+}
+
+#life-preset {
+  font-size: inherit;
+  color: var(--text-dark);
+  background: #cdc1b4;
+  border: none;
+  border-radius: 3px;
+  padding: 1px 3px;
+  font-weight: bold;
+  cursor: pointer;
 }
 
 /* ボンバーマンのブロック量コントロール（bomber モード時のみ表示） */
