@@ -4,9 +4,9 @@
 
 (() => {
   const MODE_KEY = 'widget.mode';
-  const MODE_ORDER = ['2048', 'puyo', 'rush'];
-  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour' };
-  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush' };
+  const MODE_ORDER = ['2048', 'puyo', 'rush', 'invaders'];
+  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー' };
+  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV' };
 
   const titleEl = document.getElementById('title');
   const scoreEl = document.getElementById('score');
@@ -39,7 +39,8 @@
   const widgets = {
     '2048': window.createWidget2048(ctx),
     puyo: window.createWidgetPuyo(ctx),
-    rush: window.createWidgetRush(ctx)
+    rush: window.createWidgetRush(ctx),
+    invaders: window.createWidgetInvaders(ctx)
   };
 
   // 起動モード：URL パラメータ > 前回の選択 > 2048
