@@ -3,9 +3,12 @@
 
 window.createWidgetPuyo = function (ctx) {
   const { W, H, CHILD_D, CHAIN_BONUS } = window.Puyo;
-  const TICK_MS = 90;
-  const MANUAL_FALL_TICKS = 6; // 手動時の自然落下間隔（ティック数）
-  const RESTART_TICKS = 9;
+  const TICK_MS = 33;          // 滑らかなアニメのため細かく刻む
+  const AI_STEP_TICKS = 3;     // AI/落下の操作間隔（約 100ms）
+  const MANUAL_FALL_TICKS = 16;// 手動時の自然落下間隔
+  const RESTART_TICKS = 24;
+  const POP_TICKS = 10;        // 消去エフェクトの長さ
+  const CHAIN_LABEL_TICKS = 22;// 「n 連鎖!」表示
   const BEST_KEY = 'widgetPuyo.best';
   const GAMES_KEY = 'widgetPuyo.games';
   const MAXCHAIN_KEY = 'widgetPuyo.maxChain';
@@ -77,8 +80,11 @@ window.createWidgetPuyo = function (ctx) {
   let popTicks = 0;
   let popGain = 0;
   let gravCounter = 0;
+  let aiCounter = 0;       // AI/落下操作の間引き
   let restartCountdown = -1;
   let chainLabelTicks = 0; // 「n 連鎖!」表示の残りティック
+  const makeVoff = () => Array.from({ length: H }, () => new Array(W).fill(0));
+  let voff = makeVoff();   // 各セルの落下アニメ用オフセット（行単位・負=上）
 
   function rndPair() {
     const r = () => 1 + Math.floor(Math.random() * Puyo.NUM_COLORS);
@@ -131,14 +137,31 @@ window.createWidgetPuyo = function (ctx) {
     return true;
   }
 
+  // 重力を適用しつつ、動いたぷよに落下オフセット（負＝上）を設定して滑らかに落とす
+  function applyGravityAnimated() {
+    for (let c = 0; c < W; c++) {
+      const colors = [], froms = [];
+      for (let r = 0; r < H; r++) {
+        if (grid[r][c] !== 0) { colors.push(grid[r][c]); froms.push(r); }
+        grid[r][c] = 0; voff[r][c] = 0;
+      }
+      let r = H - 1;
+      for (let i = colors.length - 1; i >= 0; i--) {
+        grid[r][c] = colors[i];
+        voff[r][c] = froms[i] - r; // <= 0（元の高い位置から落ちてくる）
+        r--;
+      }
+    }
+  }
+
   function lock() {
     for (const [r, c, color] of pairCells(cur)) {
       if (r >= 0) grid[r][c] = color;
     }
     cur = null;
     chainNum = 0;
-    Puyo.applyGravity(grid);
-    state = 'check';
+    applyGravityAnimated();
+    state = 'settle';
   }
 
   function gameOver() {
@@ -151,11 +174,13 @@ window.createWidgetPuyo = function (ctx) {
 
   function reset() {
     grid = Puyo.emptyGrid();
+    voff = makeVoff();
     queue = [rndPair(), rndPair()];
     cur = null;
     over = false;
     score = 0;
     chainNum = 0;
+    popping = [];
     state = 'spawn';
     restartCountdown = -1;
     ctx.hideOverlay();
@@ -193,7 +218,9 @@ window.createWidgetPuyo = function (ctx) {
       case 'falling': {
         if (!cur) { state = 'spawn'; break; }
         if (auto && target) {
-          // 1 ティックに 1 アクション：回転 → 横移動 → 高速落下（2 段/tick）
+          if (++aiCounter < AI_STEP_TICKS) break;
+          aiCounter = 0;
+          // 1 操作ずつ：回転 → 横移動 → 高速落下（2 段）
           if (cur.rot !== target.rot) {
             if (!tryRotate()) { if (!tryFall()) lock(); }
           } else if (cur.c !== target.col) {
@@ -210,18 +237,31 @@ window.createWidgetPuyo = function (ctx) {
         }
         break;
       }
+      case 'settle': {
+        // 落下オフセットをゆっくり 0 へ（ぬるっと着地）
+        let moving = false;
+        for (let r = 0; r < H; r++) {
+          for (let c = 0; c < W; c++) {
+            if (voff[r][c] < 0) {
+              voff[r][c] *= 0.55;
+              if (voff[r][c] > -0.04) voff[r][c] = 0; else moving = true;
+            }
+          }
+        }
+        if (!moving) state = 'check';
+        break;
+      }
       case 'check': {
         const groups = Puyo.findGroups(grid);
         if (groups.length === 0) {
           state = 'spawn';
         } else {
           chainNum++;
-          chainLabelTicks = 8;
+          chainLabelTicks = CHAIN_LABEL_TICKS;
           popping = groups.flat();
-          let popped = popping.length;
-          popGain = popped * 10 *
+          popGain = popping.length * 10 *
             CHAIN_BONUS[Math.min(chainNum - 1, CHAIN_BONUS.length - 1)];
-          popTicks = 3;
+          popTicks = POP_TICKS;
           state = 'popping';
         }
         break;
@@ -235,9 +275,9 @@ window.createWidgetPuyo = function (ctx) {
             maxChain = chainNum;
             localStorage.setItem(MAXCHAIN_KEY, String(maxChain));
           }
-          Puyo.applyGravity(grid);
+          applyGravityAnimated();
           updateScores();
-          state = 'check';
+          state = 'settle';
         }
         break;
       }
@@ -271,6 +311,31 @@ window.createWidgetPuyo = function (ctx) {
     drawPuyoSprite(c * cell, (r - 1) * cell, cell, color, alpha);
   }
 
+  // 消えるエフェクト：縮んで白く光り、リングと粒が弾ける
+  function drawPop(r, c, color, p) {
+    if (r < 1) return;
+    const cx = c * cell + cell / 2, cy = (r - 1) * cell + cell / 2;
+    const rad = cell * 0.46 * (1 - p);
+    if (rad > 0.5) {
+      g2d.globalAlpha = 1;
+      g2d.fillStyle = PUYO_COLORS[color];
+      g2d.beginPath(); g2d.arc(cx, cy, rad, 0, Math.PI * 2); g2d.fill();
+      g2d.fillStyle = `rgba(255,255,255,${0.45 + 0.55 * p})`;
+      g2d.beginPath(); g2d.arc(cx, cy, rad * 0.78, 0, Math.PI * 2); g2d.fill();
+    }
+    g2d.globalAlpha = Math.max(0, 1 - p);
+    g2d.strokeStyle = '#ffffff';
+    g2d.lineWidth = Math.max(1, cell * 0.06);
+    g2d.beginPath(); g2d.arc(cx, cy, cell * 0.28 + cell * 0.5 * p, 0, Math.PI * 2); g2d.stroke();
+    g2d.fillStyle = PUYO_COLORS[color];
+    const dist = cell * 0.55 * p, s = cell * 0.12;
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + Math.PI / 4;
+      g2d.fillRect(cx + Math.cos(a) * dist - s / 2, cy + Math.sin(a) * dist - s / 2, s, s);
+    }
+    g2d.globalAlpha = 1;
+  }
+
   function render() {
     const fieldW = W * cell;
     g2d.clearRect(0, 0, canvas.width, canvas.height);
@@ -281,10 +346,15 @@ window.createWidgetPuyo = function (ctx) {
     const popSet = new Set(popping.map(([r, c]) => `${r},${c}`));
     for (let r = 1; r < H; r++) {
       for (let c = 0; c < W; c++) {
-        if (grid[r][c] === 0) continue;
-        const isPopping = popSet.has(`${r},${c}`);
-        drawPuyo(r, c, grid[r][c], isPopping && popTicks % 2 === 0 ? 0.25 : 1);
+        if (grid[r][c] === 0 || popSet.has(`${r},${c}`)) continue;
+        // 落下オフセットを反映して「ぬるっと」描画
+        drawPuyoSprite(c * cell, (r - 1) * cell + voff[r][c] * cell, cell, grid[r][c]);
       }
+    }
+    // 消去エフェクト
+    if (popping.length) {
+      const p = 1 - popTicks / POP_TICKS;
+      for (const [r, c] of popping) drawPop(r, c, grid[r][c], p);
     }
     if (cur) for (const [r, c, color] of pairCells(cur)) drawPuyo(r, c, color);
 
@@ -299,13 +369,24 @@ window.createWidgetPuyo = function (ctx) {
       drawPuyoSprite(px + cell * 0.1, cell * 1.9, cell * 0.9, next[0]); // 軸ぷよ
     }
 
-    // 連鎖表示
+    // 連鎖表示（ポップインしてフェードアウト）
     if (chainLabelTicks > 0 && chainNum > 0) {
       chainLabelTicks--;
-      g2d.fillStyle = 'rgba(255,255,255,0.92)';
-      g2d.font = `bold ${Math.floor(cell * 0.9)}px sans-serif`;
+      const age = 1 - chainLabelTicks / CHAIN_LABEL_TICKS;     // 0→1
+      const scale = age < 0.25 ? 0.5 + (age / 0.25) * 0.6 : 1.1; // 出だしに拡大
+      const alpha = chainLabelTicks < 6 ? chainLabelTicks / 6 : 1; // 末尾でフェード
+      g2d.save();
+      g2d.globalAlpha = alpha;
+      g2d.translate(fieldW / 2, canvas.height * 0.4);
+      g2d.scale(scale, scale);
+      g2d.fillStyle = '#fff';
+      g2d.strokeStyle = 'rgba(0,0,0,0.35)';
+      g2d.lineWidth = cell * 0.08;
+      g2d.font = `bold ${Math.floor(cell * 0.95)}px sans-serif`;
       g2d.textAlign = 'center';
-      g2d.fillText(`${chainNum} 連鎖!`, fieldW / 2, canvas.height * 0.4);
+      g2d.strokeText(`${chainNum} 連鎖!`, 0, 0);
+      g2d.fillText(`${chainNum} 連鎖!`, 0, 0);
+      g2d.restore();
       g2d.textAlign = 'left';
     }
   }
