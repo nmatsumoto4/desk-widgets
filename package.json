@@ -1,7 +1,7 @@
 {
-  "name": "desk-widgets",
+  "name": "the-retro-center",
   "version": "1.0.4",
-  "description": "Desktop widgets: self-playing 2048 / Puyo Puyo / Rush Hour / Space Invaders / Bomberman",
+  "description": "THE RETRO CENTER — desktop widgets of self-playing retro games (2048 / Puyo Puyo / Rush Hour / Invaders / Bomberman / Tetris / Snake / Life)",
   "main": "main.js",
   "author": "nmatsumoto4",
   "license": "MIT",
@@ -15,8 +15,8 @@
     "ws": "^8.21.0"
   },
   "build": {
-    "appId": "jp.nmatsumoto4.deskwidgets",
-    "productName": "DeskWidgets",
+    "appId": "jp.nmatsumoto4.theretrocenter",
+    "productName": "THE RETRO CENTER",
     "directories": {
       "output": "dist"
     },

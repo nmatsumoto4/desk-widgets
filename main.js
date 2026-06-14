@@ -1,6 +1,9 @@
 const { app, BrowserWindow, screen, ipcMain, globalShortcut, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 
+const APP_NAME = 'THE RETRO CENTER';
+app.setName(APP_NAME);
+
 const WIDTH = 280;
 const HEIGHT = 360;
 const MARGIN = 16;
@@ -77,25 +80,64 @@ function toggleHideAll() {
 
 // メニューバー（トレイ）アイコン：ショートカット以外で復帰できる導線
 let tray = null;
-function buildTrayIcon() {
-  const S = 16;
-  const buf = Buffer.alloc(S * S * 4); // BGRA（初期値 0 = 透明）
-  const dots = [[2, 2], [9, 2], [2, 9], [9, 9]];
-  for (const [ox, oy] of dots) {
-    for (let y = 0; y < 5; y++) {
-      for (let x = 0; x < 5; x++) {
-        const i = ((oy + y) * S + (ox + x)) * 4;
-        buf[i] = 34; buf[i + 1] = 126; buf[i + 2] = 230; buf[i + 3] = 255; // オレンジ #e67e22
-      }
+
+// アーケード筐体（ゲーセン）風のドット絵アイコンを生成する
+// '#'=本体 / 'S'=画面（光る）/ '.'=透明。16×16 を scale 倍で描く
+const CABINET = [
+  '..############..', // マーキー（光る看板）上枠
+  '..#SSSSSSSSSS#..', // マーキーの光
+  '..############..',
+  '.##############.', // 本体の肩
+  '.##.SSSSSSSS.##.', // 画面
+  '.##.SSSSSSSS.##.',
+  '.##.SSSSSSSS.##.',
+  '.##.SSSSSSSS.##.',
+  '.##############.', // 画面下
+  '.##############.', // コントロールパネル／本体
+  '.##############.',
+  '.##############.',
+  '.##############.',
+  '.##..........##.', // 脚
+  '.##..........##.',
+  '.##..........##.'
+];
+
+function buildCabinetIcon(body, screen) {
+  const P = 2;            // 拡大率（くっきり用）
+  const S = 16 * P;
+  const buf = Buffer.alloc(S * S * 4); // BGRA, 透明
+  const set = (x, y, col) => {
+    const i = (y * S + x) * 4;
+    buf[i] = col[2]; buf[i + 1] = col[1]; buf[i + 2] = col[0]; buf[i + 3] = 255;
+  };
+  for (let r = 0; r < 16; r++) {
+    const row = CABINET[r] || '';
+    for (let c = 0; c < 16; c++) {
+      const ch = row[c] || '.';
+      if (ch === '.') continue;
+      const col = ch === 'S' ? screen : body;
+      for (let dy = 0; dy < P; dy++)
+        for (let dx = 0; dx < P; dx++)
+          set(c * P + dx, r * P + dy, col);
     }
   }
   return nativeImage.createFromBitmap(buf, { width: S, height: S });
 }
+
 function createTray() {
   try {
-    tray = new Tray(buildTrayIcon());
-    tray.setToolTip('DeskWidgets');
+    const isMac = process.platform === 'darwin';
+    // mac はテンプレート（黒）でメニューバーに自動適応。他 OS は視認できる色で
+    const icon = isMac
+      ? buildCabinetIcon([0, 0, 0], [0, 0, 0])
+      : buildCabinetIcon([225, 225, 230], [80, 200, 255]);
+    if (isMac) icon.setTemplateImage(true);
+    tray = new Tray(icon);
+    tray.setToolTip(APP_NAME);
+    if (isMac) tray.setTitle(` ${APP_NAME}`); // メニューバーに名前を表示
     const menu = Menu.buildFromTemplate([
+      { label: APP_NAME, enabled: false },
+      { type: 'separator' },
       { label: 'ウィジェットを表示 / 隠す', click: toggleHideAll },
       { label: 'すべて表示', click: () => setAllVisible(true) },
       { type: 'separator' },
@@ -104,11 +146,10 @@ function createTray() {
       { label: '終了', click: () => app.quit() }
     ]);
     tray.setContextMenu(menu);
-    // 左クリックでも表示を復帰（macOS はメニューが開く）
     tray.on('click', () => setAllVisible(true));
-    console.log('[deskwidgets] tray created');
+    console.log('[retrocenter] tray created');
   } catch (e) {
-    console.log('[deskwidgets] tray failed:', e.message);
+    console.log('[retrocenter] tray failed:', e.message);
   }
 }
 
