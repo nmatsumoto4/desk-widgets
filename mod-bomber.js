@@ -12,9 +12,9 @@
 window.createWidgetBomber = function (ctx) {
   const COLS = 11, ROWS = 11;
   const TICK_MS = 33;
-  const FUSE = 2.2;          // 爆弾の導火（秒）
+  const FUSE = 1.9;          // 爆弾の導火（秒）
   const FLAME_DUR = 0.5;     // 炎の持続（秒）
-  const ROUND_LIMIT = 75;    // ラウンド最長（秒）。膠着防止
+  const ROUND_LIMIT = 50;    // ラウンド最長（秒）。膠着防止
   const RESTART_TICKS = Math.round(1600 / TICK_MS);
   const DENS_KEY = 'widgetBomber.dens';
   const ROUNDS_KEY = 'widgetBomber.rounds';
@@ -109,7 +109,7 @@ window.createWidgetBomber = function (ctx) {
       id: i, color: P_COLORS[i], accent: P_ACCENT[i],
       x: s.c + 0.5, y: s.r + 0.5,
       alive: true, moving: false, tx: 0, ty: 0,
-      maxBombs: 1, bombs: 0, power: 2, speed: 3.2,
+      maxBombs: 1, bombs: 0, power: 2, speed: 5.4,
       think: 0, lastDir: null
     }));
     state = 'play';
@@ -322,7 +322,7 @@ window.createWidgetBomber = function (ctx) {
   function applyPowerup(pl, pu) {
     if (pu.type === 'bomb') pl.maxBombs = Math.min(6, pl.maxBombs + 1);
     else if (pu.type === 'fire') pl.power = Math.min(7, pl.power + 1);
-    else if (pu.type === 'speed') pl.speed = Math.min(6, pl.speed + 0.6);
+    else if (pu.type === 'speed') pl.speed = Math.min(9, pl.speed + 0.8);
   }
 
   // ---- 進行 ----
@@ -484,7 +484,7 @@ window.createWidgetBomber = function (ctx) {
   function drawRobot(pl) {
     const cols = 8, rows = ROBOT_FRAMES[0].length;
     // 歩行中だけ脚を動かし、わずかに上下する
-    const stepping = pl.moving && (Math.floor(animClock / 0.13) % 2 === 1);
+    const stepping = pl.moving && (Math.floor(animClock / 0.1) % 2 === 1);
     const pat = ROBOT_FRAMES[stepping ? 1 : 0];
     const dot = scale * 0.135;
     const w = cols * dot, h = rows * dot;
