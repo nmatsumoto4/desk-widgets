@@ -103,6 +103,7 @@ window.createWidgetBreakout = function (ctx) {
     buildLevel();
     state = 'play';
     levelupTicks = 0;
+    ctx.hideOverlay();   // レベルアップ表示を必ず消す（クリア表示が残るのを防ぐ）
     updateScores();
     updateLvLabel();
   }
