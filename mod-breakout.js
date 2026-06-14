@@ -171,7 +171,7 @@ window.createWidgetBreakout = function (ctx) {
 
   // ---- 物理 ----
   function moveBall(b, dt) {
-    const steps = 3, h = dt / steps;
+    const steps = auto ? 5 : 3, h = dt / steps; // 高速時はサブステップを増やして貫通防止
     for (let s = 0; s < steps; s++) {
       b.x += b.vx * h; b.y += b.vy * h;
       if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx); }
@@ -223,7 +223,8 @@ window.createWidgetBreakout = function (ctx) {
   }
 
   function tick() {
-    const dt = TICK_MS / 1000;
+    // AI 自動運転中はボール等を高速化
+    const dt = TICK_MS / 1000 * (auto ? 1.7 : 1);
     clock += dt;
     if (flash > 0) flash = Math.max(0, flash - dt * 3);
 
@@ -268,10 +269,11 @@ window.createWidgetBreakout = function (ctx) {
 
     noBreak += dt; steerTimer -= dt;
     for (const b of balls) moveBall(b, bdt);
-    // しばらく崩せていない → 全ボールを壊せるブロックへ向ける（noBreak は実破壊時のみ 0）
-    if (noBreak > 2 && steerTimer <= 0) { steerToBricks(); steerTimer = 1; }
+    // 通常プレイ（頻繁に崩せる）では作動せず、本当に詰まった時だけ救済する
+    // （閾値を上げて、空中でボールが急に曲がる違和感をなくす）
+    if (noBreak > 4 && steerTimer <= 0) { steerToBricks(); steerTimer = 1.2; }
     // 鋼鉄で囲まれて到達不能などの最終手段：最下段の壊せるブロックを崩す
-    if (noBreak > 7) forceBreakOne();
+    if (noBreak > 9) forceBreakOne();
     balls = balls.filter((b) => b.y - b.r < FH);
     if (balls.length === 0) {
       lives--;
