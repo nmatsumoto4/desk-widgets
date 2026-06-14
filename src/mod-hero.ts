@@ -199,7 +199,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     if (t === 'dragon') return Math.min(6, 1 + Math.floor(level / 5)); // 希少な頂点捕食者
     return cap;                                                        // トカゲ＝主力（残り枠）
   }
-  function creatureCap() { return Math.min(76, 34 + level * 2.2) | 0; }
+  function creatureCap() { return Math.min(88, 40 + level * 2.7) | 0; }
   function spawnCreature(type: CKey, cell: number, cost = 0) {
     if (creatures.length >= creatureCap() || countType(type) >= typeCap(type)) return;
     const r = (cell / COLS) | 0, c = cell % COLS, def = C[type], hpScale = 1 + level * 0.05;
@@ -207,7 +207,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     creatures.push({ type, x: c + 0.5, y: r + 0.5, tr: r, tc: c, hp: def.hp * hpScale, maxhp: def.hp * hpScale, atk: def.atk, fed: 0, carry: 0, stored: cost, cd: 0, flash: 0, fly: !!def.fly });
   }
   function spawnHero(cls: string) {
-    const def = H[cls], hpScale = 1 + level * 0.34, atkScale = 1 + level * 0.19;
+    const def = H[cls], hpScale = 1 + level * 0.26, atkScale = 1 + level * 0.17;
     heroes.push({ x: entranceC + 0.5, y: entranceR + 0.5, tr: entranceR, tc: entranceC, cls, def, hp: def.hp * hpScale, maxhp: def.hp * hpScale, atk: def.atk * atkScale, speed: def.speed, mp: def.mp, cd: 0, castcd: rnd(1, 3), flash: 0, carrying: false });
   }
 
@@ -233,13 +233,16 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     for (const p of path) for (const [dr, dc] of NB) { const r = p.r + dr, c = p.c + dc; if (inB(r, c) && cellType[idx(r, c)] === 0) frontier.push(idx(r, c)); }
     if (frontier.length === 0) return;
     // 「養分の薄い土」かつ「隣に濃い鉱脈がある」マスを優先 → 鉱脈を温存しつつ通路へ露出
-    let cell = frontier[(Math.random() * frontier.length) | 0], bs = -Infinity;
-    for (let i = 0; i < 20; i++) {
+    let cell = -1, bs = -Infinity, bestMx = 0;
+    for (let i = 0; i < 24; i++) {
       const f = frontier[(Math.random() * frontier.length) | 0];
       let mx = 0; for (const wn of wallNbrs(f)) if (nutrient[wn] > mx) mx = nutrient[wn];
       const score = mx - nutrient[f] * 2 + Math.random() * 2;
-      if (score > bs) { bs = score; cell = f; }
+      if (score > bs) { bs = score; cell = f; bestMx = mx; }
     }
+    // つるはしは目的のある時だけ：露出する価値のある鉱脈が近くに無ければ掘らずに休む
+    // （無駄に道を広げると勇者の侵入路が増えるだけ＝掘るかどうかのジレンマ）
+    if (cell < 0 || bestMx < 4) return;
     // 掘る壁の(僅かな)資源は隣接する壁へ逃がす（道に養分は残さない）
     if (nutrient[cell] > 0) { scatter(cell, nutrient, nutrient[cell]); nutrient[cell] = 0; }
     if (magic[cell] > 0) { scatter(cell, magic, magic[cell]); magic[cell] = 0; }
@@ -265,7 +268,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
   // 濃縮した「壁(土)」から、面した通路へ上位種が湧く（定石の自動化）
   function densitySpawn() {
     // 魔分は揮発性：余剰はゆっくり散逸（溜め込み暴走を防ぐ。養分は保存）
-    for (let i = 0; i < magic.length; i++) if (cellType[i] === 0 && magic[i] > 0) magic[i] *= 0.996;
+    for (let i = 0; i < magic.length; i++) if (cellType[i] === 0 && magic[i] > 0) magic[i] *= 0.998;
     upTier(richestWall(nutrient), nutrient, 'lizard', 'insect', NUT_T.lizard, NUT_T.insect);
     upTier(richestWall(magic), magic, 'dragon', 'lilith', MAG_T.dragon, MAG_T.lilith);
     for (let k = 0; k < 8; k++) { const w = randomWall(); upTier(w, nutrient, 'lizard', 'insect', NUT_T.lizard, NUT_T.insect); upTier(w, magic, 'dragon', 'lilith', MAG_T.dragon, MAG_T.lilith); }
@@ -336,11 +339,14 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
       // 魔法使い等は詠唱して魔分を撒く（運搬中も逃げず戦う＝近接交戦は継続）
       if (h.def.mage && h.mp > 0) { h.castcd -= dt; if (h.castcd <= 0) { h.castcd = rnd(1.6, 2.8); const spend = Math.min(h.mp, 6); h.mp -= spend; const mw = wallNbrs(idx(cc.r, cc.c)); if (mw.length) magic[mw[(Math.random() * mw.length) | 0]] = Math.min(48, magic[mw[(Math.random() * mw.length) | 0]] + spend); floatText(h.x, h.y, '魔法', '#9aa6f4'); // 周囲のモンスターへダメージ
         for (const cr of creatures) if (!cr.dead && dl(h.x, h.y, cr.x, cr.y) < 2.4) damageCreature(cr, h.atk * 0.8); } }
-      // 隣接モンスターと交戦
+      // 隣接モンスターを攻撃（ただし足は止めない＝ガントレットを押し進む）
       let foe: Creature | null = null, fd = 0.95;
       for (const cr of creatures) { if (cr.dead || cr.type === 'moss') continue; const d = dl(h.x, h.y, cr.x, cr.y); if (d < fd) { fd = d; foe = cr; } }
       if (foe) { h.cd -= dt; if (h.cd <= 0) { h.cd = 0.45; damageCreature(foe, h.atk); h.flash = 0.15; } }
-      else { const field = h.carrying ? distEntr : distCore; if (atCenter(h, h.tr, h.tc)) { const nx = gradientNext(h, field); h.tr = nx.r; h.tc = nx.c; } stepToward(h, h.tr, h.tc, dt, h.carrying ? h.speed * 0.5 : h.speed); }
+      // 常に目的地へ前進（魔王へ／捕獲後は入口へ）。立ち止まらないのでウェーブは必ず決着する
+      const field = h.carrying ? distEntr : distCore;
+      if (atCenter(h, h.tr, h.tc)) { const nx = gradientNext(h, field); h.tr = nx.r; h.tc = nx.c; }
+      stepToward(h, h.tr, h.tc, dt, h.carrying ? h.speed * 0.5 : h.speed);
     }
   }
 
@@ -377,18 +383,24 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     stepToward(cr, cr.tr, cr.tc, dt, C[cr.type].speed);
   }
 
-  // 戦闘員の移動：近くのヒーローだけを狙って迎撃。ドラゴンは火を吹く（範囲）
+  // 戦闘員の移動：近くのヒーローだけを狙って迎撃。ドラゴンは通路に沿って直線で火を吹く
   function combatMove(cr: Creature, dt: number, def: CDef) {
-    const range = def.fire ? 3.4 : def.ranged ? 2.6 : 0.95;
-    let target: Hero | null = null, td = range;
-    for (const h of heroes) { if (h.dead) continue; const d = dl(cr.x, cr.y, h.x, h.y); if (d < td) { td = d; target = h; } }
-    if (target) {
+    if (def.fire) {
       cr.cd -= dt;
-      if (cr.cd <= 0) { cr.cd = def.fire ? 1.1 : def.ranged ? 0.7 : 0.5; cr.flash = 0.15; if (def.fire) fireBreath(cr, target); else { damageHero(target, cr.atk); if (def.ranged) beam(cr, target); } }
-      if (def.ranged || def.fire) return;   // 遠距離・火噴きは近づかずその場で撃つ
+      if (cr.cd <= 0 && dragonFire(cr)) { cr.cd = 1.2; cr.flash = 0.15; return; }  // 直線上に勇者がいれば焼く
+      // 直線が通らなければ移動して射線を合わせにいく（下の移動へ）
+    } else {
+      const range = def.ranged ? 2.6 : 0.95;
+      let target: Hero | null = null, td = range;
+      for (const h of heroes) { if (h.dead) continue; const d = dl(cr.x, cr.y, h.x, h.y); if (d < td) { td = d; target = h; } }
+      if (target) {
+        cr.cd -= dt;
+        if (cr.cd <= 0) { cr.cd = def.ranged ? 0.7 : 0.5; cr.flash = 0.15; damageHero(target, cr.atk); if (def.ranged) beam(cr, target); }
+        if (def.ranged) return;
+      }
     }
     let tx = -1, ty = -1;
-    { let best = 3.6, h: Hero | null = null; for (const hh of heroes) { if (hh.dead) continue; const d = dl(cr.x, cr.y, hh.x, hh.y); if (d < best) { best = d; h = hh; } } if (h) { tx = h.x; ty = h.y; } }
+    { const notice = def.fire ? 9 : 3.6; let best = notice, h: Hero | null = null; for (const hh of heroes) { if (hh.dead) continue; const d = dl(cr.x, cr.y, hh.x, hh.y); if (d < best) { best = d; h = hh; } } if (h) { tx = h.x; ty = h.y; } }
     const cc = curCell(cr);
     if (atCenter(cr, cr.tr, cr.tc)) {
       let br = cc.r, bc = cc.c, bv = Infinity;
@@ -410,7 +422,7 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
       // （壁に染み込み、エレメントが運び濃縮 → 魔力系の食物連鎖が育つ。本家の「しかばねの魔分」）
       scatter(dcell, nutrient, 10 + level * 0.6);
       const dw = wallNbrs(dcell);
-      if (dw.length) { let hi = dw[0]; for (const w of dw) if (magic[w] > magic[hi]) hi = w; magic[hi] = Math.min(48, magic[hi] + Math.min(30, h.mp * 0.5) + 7); }
+      if (dw.length) { let hi = dw[0]; for (const w of dw) if (magic[w] > magic[hi]) hi = w; magic[hi] = Math.min(48, magic[hi] + Math.min(34, h.mp * 0.5) + 11 + level * 0.4); }
       burst(h.x, h.y, h.def.color, 12); floatText(h.x, h.y, '撃退!', '#ffd24a');
       if (window.SFX) window.SFX.explode && window.SFX.explode();
       if (h.carrying) { overlord.state = 'dropped'; overlord.dropT = 2.0; overlord.carrier = null; floatText(h.x, h.y, '魔王 奪還', '#c050ff'); }
@@ -420,15 +432,28 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
 
   function beam(cr: Creature, h: Hero) { beams.push({ x1: cr.x, y1: cr.y, x2: h.x, y2: h.y, life: 0.12, color: C[cr.type].color }); }
 
-  // ドラゴンの火炎：対象を中心に範囲ダメージ＋炎の演出
-  function fireBreath(cr: Creature, target: Hero) {
-    const ang = Math.atan2(target.y - cr.y, target.x - cr.x);
-    for (const h of heroes) { if (h.dead) continue; const d = dl(target.x, target.y, h.x, h.y); if (d < 1.7) { damageHero(h, cr.atk * (h === target ? 1 : 0.6)); h.flash = 0.2; } }
-    fires.push({ x: cr.x, y: cr.y, ang, life: 0.3 });
-    for (let i = 0; i < 10; i++) { const a = ang + rnd(-0.4, 0.4), s = rnd(3, 7); particles.push({ x: cr.x + Math.cos(ang) * 0.5, y: cr.y + Math.sin(ang) * 0.5, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rnd(0.2, 0.5), color: i % 2 ? '#ff9a30' : '#ffd24a' }); }
+  // ドラゴンの火炎：通路に沿ってまっすぐ壁（道の端）まで噴き、線上の勇者全員を焼く
+  function dragonFire(cr: Creature): boolean {
+    const cc = curCell(cr);
+    let best: { cells: number[]; hit: Hero[] } | null = null;
+    for (const [dr, dc] of NB) {
+      const cells: number[] = []; let r = cc.r + dr, c = cc.c + dc;
+      while (inB(r, c) && cellType[idx(r, c)] !== 0) { cells.push(idx(r, c)); r += dr; c += dc; }   // 壁にぶつかるまで＝道の端まで
+      if (!cells.length) continue;
+      const set = new Set(cells); const hit: Hero[] = [];
+      for (const h of heroes) { if (h.dead) continue; if (set.has(idx(Math.floor(h.y), Math.floor(h.x)))) hit.push(h); }
+      if (hit.length && (!best || hit.length > best.hit.length || (hit.length === best.hit.length && cells.length > best.cells.length))) best = { cells, hit };
+    }
+    if (!best) return false;
+    for (const h of best.hit) { damageHero(h, cr.atk); h.flash = 0.2; }
+    const end = best.cells[best.cells.length - 1];
+    const ex = (end % COLS) + 0.5, ey = ((end / COLS) | 0) + 0.5;
+    fires.push({ x1: cr.x, y1: cr.y, x2: ex, y2: ey, life: 0.34 });
+    for (let i = 0; i < 9; i++) { const t = Math.random(); particles.push({ x: cr.x + (ex - cr.x) * t, y: cr.y + (ey - cr.y) * t, vx: rnd(-1.2, 1.2), vy: rnd(-1.2, 1.2), life: rnd(0.2, 0.5), color: i % 2 ? '#ff9a30' : '#ffd24a' }); }
     if (window.SFX) window.SFX.explode && window.SFX.explode();
+    return true;
   }
-  let fires: { x: number; y: number; ang: number; life: number }[] = [];
+  let fires: { x1: number; y1: number; x2: number; y2: number; life: number }[] = [];
 
   function decayFx(dt: number) {
     for (const p of particles) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; } particles = particles.filter((p) => p.life > 0);
@@ -489,8 +514,8 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
 
     if (overlord.state !== 'carried') drawOverlord(overlord.x, overlord.y);
     for (const b of beams) { g2d.save(); g2d.shadowColor = b.color; g2d.shadowBlur = scale; g2d.strokeStyle = b.color; g2d.lineWidth = scale * 0.12; g2d.globalAlpha = Math.min(1, b.life * 9); g2d.beginPath(); g2d.moveTo(sx(b.x1), sy(b.y1)); g2d.lineTo(sx(b.x2), sy(b.y2)); g2d.stroke(); g2d.restore(); }
-    // ドラゴンの火炎
-    for (const fr of fires) { const a = Math.max(0, fr.life / 0.3), len = scale * 2.6 * (1.2 - a * 0.4); g2d.save(); g2d.globalAlpha = a; g2d.shadowColor = '#ff7a2a'; g2d.shadowBlur = scale; g2d.translate(sx(fr.x), sy(fr.y)); g2d.rotate(fr.ang); g2d.fillStyle = '#ffd24a'; g2d.beginPath(); g2d.moveTo(0, 0); g2d.lineTo(len, -scale * 0.8); g2d.lineTo(len, scale * 0.8); g2d.closePath(); g2d.fill(); g2d.fillStyle = '#ff7a2a'; g2d.beginPath(); g2d.moveTo(0, 0); g2d.lineTo(len * 0.66, -scale * 0.42); g2d.lineTo(len * 0.66, scale * 0.42); g2d.closePath(); g2d.fill(); g2d.restore(); }
+    // ドラゴンの火炎（通路に沿う直線ビーム）
+    for (const fr of fires) { const a = Math.max(0, fr.life / 0.34); g2d.save(); g2d.globalAlpha = a; g2d.shadowColor = '#ff7a2a'; g2d.shadowBlur = scale; g2d.lineCap = 'round'; g2d.strokeStyle = '#ffd24a'; g2d.lineWidth = scale * 0.6; g2d.beginPath(); g2d.moveTo(sx(fr.x1), sy(fr.y1)); g2d.lineTo(sx(fr.x2), sy(fr.y2)); g2d.stroke(); g2d.strokeStyle = '#ff7a2a'; g2d.lineWidth = scale * 0.3; g2d.stroke(); g2d.strokeStyle = '#fff0c0'; g2d.lineWidth = scale * 0.12; g2d.stroke(); g2d.restore(); }
     g2d.globalAlpha = 1;
     for (const cr of creatures) drawCreature(cr);
     for (const h of heroes) drawHero(h);
@@ -553,7 +578,11 @@ window.createWidgetHero = function (ctx: WidgetCtx): WidgetModule {
     if (def.mage) { g2d.strokeStyle = '#bcd0ff'; g2d.lineWidth = scale * 0.1; g2d.beginPath(); g2d.moveTo(x + r * 0.6, y + r * 0.7); g2d.lineTo(x + r * 0.6, y - r * 1.0); g2d.stroke(); g2d.fillStyle = '#bcd0ff'; g2d.beginPath(); g2d.arc(x + r * 0.6, y - r * 1.0, r * 0.22, 0, TAU); g2d.fill(); }
     else { g2d.strokeStyle = '#dfe6ee'; g2d.lineWidth = scale * 0.12; g2d.lineCap = 'round'; g2d.beginPath(); g2d.moveTo(x + r * 0.7, y + r * 0.6); g2d.lineTo(x + r * 1.1, y - r * 0.8); g2d.stroke(); }
     g2d.restore();
-    if (h.hp < h.maxhp) hpBar(x, y - r - scale * 0.3, h.hp / h.maxhp);
+    // 勇者の HP は常時表示（バー＋数値）
+    const by = y - r - scale * 0.5;
+    hpBar(x, by, h.hp / h.maxhp);
+    g2d.fillStyle = '#fff'; g2d.textAlign = 'center'; g2d.font = `bold ${Math.max(7, scale * 0.42)}px sans-serif`;
+    g2d.fillText(String(Math.max(0, Math.ceil(h.hp))), x, by - scale * 0.06);
   }
 
   function drawPick(ox: number, oy: number) {
