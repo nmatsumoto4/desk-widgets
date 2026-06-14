@@ -176,6 +176,46 @@ html, body {
   border-radius: 6px;
 }
 
+/* ボンバーマン盤面 */
+#bomber {
+  display: none;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: center;
+}
+
+#bomber-canvas {
+  border-radius: 6px;
+}
+
+/* ボンバーマンのブロック量コントロール（bomber モード時のみ表示） */
+#bomber-ctrl {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+
+#bomber-ctrl button {
+  border: none;
+  background: #cdc1b4;
+  color: var(--text-dark);
+  border-radius: 3px;
+  font-size: inherit;
+  font-weight: bold;
+  line-height: 1;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+
+#bomber-ctrl button:hover {
+  background: #b8ab9d;
+}
+
+#bomber-dens-label {
+  font-weight: bold;
+}
+
 /* Rush Hour の車台数コントロール（rush モード時のみ表示） */
 #rush-ctrl {
   display: none;

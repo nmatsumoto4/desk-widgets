@@ -4,9 +4,9 @@
 
 (() => {
   const MODE_KEY = 'widget.mode';
-  const MODE_ORDER = ['2048', 'puyo', 'rush', 'invaders'];
-  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー' };
-  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV' };
+  const MODE_ORDER = ['2048', 'puyo', 'rush', 'invaders', 'bomber'];
+  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', rush: 'Rush Hour', invaders: 'インベーダー', bomber: 'ボンバーマン' };
+  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', rush: 'Rush', invaders: 'INV', bomber: 'ボム' };
 
   const titleEl = document.getElementById('title');
   const scoreEl = document.getElementById('score');
@@ -40,7 +40,8 @@
     '2048': window.createWidget2048(ctx),
     puyo: window.createWidgetPuyo(ctx),
     rush: window.createWidgetRush(ctx),
-    invaders: window.createWidgetInvaders(ctx)
+    invaders: window.createWidgetInvaders(ctx),
+    bomber: window.createWidgetBomber(ctx)
   };
 
   // 起動モード：URL パラメータ > 前回の選択 > 2048
@@ -102,7 +103,7 @@
   window.addEventListener('blur', () => setManual(false));
 
   window.addEventListener('keydown', (e) => {
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) return;
     e.preventDefault();
     // フォーカス中に矢印キーを押したら（AI 再開ボタン押下後でも）手動に戻す
     if (!manual) setManual(true);
