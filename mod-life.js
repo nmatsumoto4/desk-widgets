@@ -10,6 +10,7 @@ window.createWidgetLife = function (ctx) {
   const STEP_TICKS = 3;       // 何ティックごとに 1 世代進めるか（約 10 世代/秒）
   const CELL_TARGET = 6;      // 1 マスの目安 px（小さめ＝多数の細胞。グライダー銃が収まる幅を確保）
   const STALL_LIMIT = 30;     // 低活性がこの世代続いたらランダム注入
+  const CYCLE_LIMIT = 6;      // 周期 1/2 のループがこの世代続いたらランダム注入
   const BEST_KEY = 'widgetLife.peak';
 
   const wrapEl = document.getElementById('life');
@@ -23,6 +24,7 @@ window.createWidgetLife = function (ctx) {
   let age = [];              // 生存世代数（色付け用）
   let generation = 0, population = 0, peak = Number(localStorage.getItem(BEST_KEY) || 0);
   let stall = 0;
+  let hashPrev = 0, hashPrev2 = 0, cycleHits = 0; // 周期ループ検出用
   let stepAccum = 0;
   let auto = false, timer = null;
   let presetIdx = 0;
@@ -91,6 +93,22 @@ window.createWidgetLife = function (ctx) {
       }
     }
     generation = 0; stall = 0;
+    hashPrev = 0; hashPrev2 = 0; cycleHits = 0;
+    countPop();
+    updateScores();
+    render();
+  }
+
+  // 盤面のハッシュ（周期検出用）
+  function hashGrid(arr) {
+    let h = 2166136261;
+    for (let i = 0; i < arr.length; i++) { h ^= arr[i]; h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+
+  // 手動ランダム追加（ボタン／Space 用）
+  function manualRandom() {
+    injectSoup(Math.max(16, (cell.length * 0.05) | 0));
     countPop();
     updateScores();
     render();
@@ -142,15 +160,27 @@ window.createWidgetLife = function (ctx) {
     population = pop;
     if (pop > peak) { peak = pop; localStorage.setItem(BEST_KEY, String(peak)); }
 
+    // 周期 1/2 ループ検出（2 世代前と一致＝点滅で止まっている状態）
+    const h = hashGrid(cell);
+    const looping = (h === hashPrev || h === hashPrev2);
+    hashPrev2 = hashPrev; hashPrev = h;
+
     // 停滞検出 → ランダム注入で動きを復活
+    const big = Math.max(14, (cell.length * 0.035) | 0);
     const lowAct = changed < Math.max(3, (cell.length * 0.015) | 0);
-    if (pop === 0 || changed === 0) {
-      injectSoup(Math.max(12, (cell.length * 0.03) | 0)); stall = 0;
-    } else if (lowAct) {
-      if (++stall >= STALL_LIMIT) { injectSoup(Math.max(12, (cell.length * 0.03) | 0)); stall = 0; }
+    let injected = false;
+    if (pop === 0 || changed === 0) {           // 完全停止・全滅
+      injectSoup(big); injected = true;
+    } else if (looping) {                        // 周期 1/2 のループ
+      if (++cycleHits >= CYCLE_LIMIT) { injectSoup(big); injected = true; }
     } else {
-      stall = 0;
+      cycleHits = 0;
     }
+    if (!injected) {                             // 長く続く低活性
+      if (lowAct) { if (++stall >= STALL_LIMIT) { injectSoup(big); injected = true; } }
+      else stall = 0;
+    }
+    if (injected) { stall = 0; cycleHits = 0; hashPrev = 0; hashPrev2 = 0; }
   }
 
   function tick() {
@@ -218,6 +248,7 @@ window.createWidgetLife = function (ctx) {
   }
 
   presetSel.addEventListener('change', () => setPreset(presetSel.value));
+  document.getElementById('life-random').addEventListener('click', manualRandom);
 
   // ---- 共通インターフェース ----
   return {
@@ -246,7 +277,7 @@ window.createWidgetLife = function (ctx) {
     key(e) {
       if (e.key === 'ArrowRight') setPreset(PRESETS[(presetIdx + 1) % PRESETS.length].id);
       else if (e.key === 'ArrowLeft') setPreset(PRESETS[(presetIdx - 1 + PRESETS.length) % PRESETS.length].id);
-      else if (e.key === ' ') injectSoup(Math.max(12, (cell.length * 0.04) | 0));
+      else if (e.key === ' ') manualRandom();
       else return false;
       return true;
     },
@@ -255,7 +286,13 @@ window.createWidgetLife = function (ctx) {
     isOver: () => false,
     _tick: tick,
     _step: stepGen,
-    _state: () => ({ generation, population, peak, stall, cols: COLS, rows: ROWS,
+    _setCells: (list) => {
+      cell.fill(0); age.fill(0);
+      for (const [r, c] of list) { cell[idx(r, c)] = 1; age[idx(r, c)] = 1; }
+      generation = 0; stall = 0; cycleHits = 0; hashPrev = 0; hashPrev2 = 0;
+      countPop();
+    },
+    _state: () => ({ generation, population, peak, stall, cycleHits, cols: COLS, rows: ROWS,
                      preset: PRESETS[presetIdx].id })
   };
 };

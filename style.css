@@ -219,9 +219,10 @@ html, body {
 #life-ctrl {
   display: none;
   align-items: center;
+  gap: 3px;
 }
 
-#life-preset {
+#life-preset, #life-random {
   font-size: inherit;
   color: var(--text-dark);
   background: #cdc1b4;
@@ -230,6 +231,10 @@ html, body {
   padding: 1px 3px;
   font-weight: bold;
   cursor: pointer;
+}
+
+#life-random:hover {
+  background: #b8ab9d;
 }
 
 /* ボンバーマンのブロック量コントロール（bomber モード時のみ表示） */
