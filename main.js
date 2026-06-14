@@ -81,56 +81,37 @@ function toggleHideAll() {
 // メニューバー（トレイ）アイコン：ショートカット以外で復帰できる導線
 let tray = null;
 
-// アーケード筐体（ゲーセン）風のドット絵アイコンを生成する
-// '#'=本体 / 'S'=画面（光る）/ '.'=透明。16×16 を scale 倍で描く
-const CABINET = [
-  '..############..', // マーキー（光る看板）上枠
-  '..#SSSSSSSSSS#..', // マーキーの光
-  '..############..',
-  '.##############.', // 本体の肩
-  '.##.SSSSSSSS.##.', // 画面
-  '.##.SSSSSSSS.##.',
-  '.##.SSSSSSSS.##.',
-  '.##.SSSSSSSS.##.',
-  '.##############.', // 画面下
-  '.##############.', // コントロールパネル／本体
-  '.##############.',
-  '.##############.',
-  '.##############.',
-  '.##..........##.', // 脚
-  '.##..........##.',
-  '.##..........##.'
-];
-
-function buildCabinetIcon(body, screen) {
-  const P = 2;            // 拡大率（くっきり用）
-  const S = 16 * P;
-  const buf = Buffer.alloc(S * S * 4); // BGRA, 透明
-  const set = (x, y, col) => {
-    const i = (y * S + x) * 4;
-    buf[i] = col[2]; buf[i + 1] = col[1]; buf[i + 2] = col[0]; buf[i + 3] = 255;
-  };
-  for (let r = 0; r < 16; r++) {
-    const row = CABINET[r] || '';
-    for (let c = 0; c < 16; c++) {
-      const ch = row[c] || '.';
-      if (ch === '.') continue;
-      const col = ch === 'S' ? screen : body;
-      for (let dy = 0; dy < P; dy++)
-        for (let dx = 0; dx < P; dx++)
-          set(c * P + dx, r * P + dy, col);
+// アーケード筐体（ゲーセン）風アイコンを矩形で描く。
+// 22×22 論理（×2=44px）に対して上下左右へ余白を取り、画面をくり抜いて
+// メニューバーで小さく・軽く見えるようにする。色は body のみ（画面は透明の穴）。
+function buildCabinetIcon(body) {
+  const U = 2, SZ = 22 * U;
+  const buf = Buffer.alloc(SZ * SZ * 4); // BGRA, 透明
+  const R = (lx, ly, lw, lh, on) => {
+    for (let y = ly * U; y < (ly + lh) * U; y++) {
+      for (let x = lx * U; x < (lx + lw) * U; x++) {
+        if (x < 0 || y < 0 || x >= SZ || y >= SZ) continue;
+        const i = (y * SZ + x) * 4;
+        if (on) { buf[i] = body[2]; buf[i + 1] = body[1]; buf[i + 2] = body[0]; buf[i + 3] = 255; }
+        else { buf[i] = 0; buf[i + 1] = 0; buf[i + 2] = 0; buf[i + 3] = 0; }
+      }
     }
-  }
-  return nativeImage.createFromBitmap(buf, { width: S, height: S });
+  };
+  R(4, 2, 14, 2, true);    // マーキー（看板）
+  R(4, 5, 14, 11, true);   // 本体
+  R(6, 7, 10, 5, false);   // 画面（くり抜き）
+  R(6, 14, 10, 1, false);  // コントロールパネルのスリット
+  R(6, 16, 10, 3, false);  // 脚の間を透明に
+  R(4, 16, 2, 3, true);    // 左脚
+  R(16, 16, 2, 3, true);   // 右脚
+  return nativeImage.createFromBitmap(buf, { width: SZ, height: SZ });
 }
 
 function createTray() {
   try {
     const isMac = process.platform === 'darwin';
     // mac はテンプレート（黒）でメニューバーに自動適応。他 OS は視認できる色で
-    const icon = isMac
-      ? buildCabinetIcon([0, 0, 0], [0, 0, 0])
-      : buildCabinetIcon([225, 225, 230], [80, 200, 255]);
+    const icon = isMac ? buildCabinetIcon([0, 0, 0]) : buildCabinetIcon([225, 225, 230]);
     if (isMac) icon.setTemplateImage(true);
     tray = new Tray(icon);
     tray.setToolTip(APP_NAME);
