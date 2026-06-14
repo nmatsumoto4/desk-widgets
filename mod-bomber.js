@@ -17,6 +17,7 @@ window.createWidgetBomber = function (ctx) {
   const FLAME_DUR = 0.5;     // 炎の持続（秒）
   const ROUND_LIMIT = 50;    // ラウンド最長（秒）。膠着防止
   const AUTO_BOOST = 1.7;    // AI 自動運転時だけ移動を高速化（手動は等倍）
+  const SD_START = 16;       // この秒数を過ぎると外周からブロックが積まれて盤面が狭まる
   const RESTART_TICKS = Math.round(1600 / TICK_MS);
   const DENS_KEY = 'widgetBomber.dens';
   const ROUNDS_KEY = 'widgetBomber.rounds';
@@ -66,6 +67,11 @@ window.createWidgetBomber = function (ctx) {
   let roundTime = 0;
   let winnerText = '';
   let animClock = 0;        // 歩行アニメ用クロック（秒）
+  let spiral = [];          // サドンデスでブロックを積む順（外周→内側の渦巻き）
+  let sdIndex = 0;          // 次に積むブロックの番号
+  let sdAccum = 0;          // サドンデスのタイマー
+  let sdInterval = 0.4;     // 1 ブロック積むごとの間隔（盤面サイズで自動調整）
+  const sdWalls = new Set();// サドンデスで積まれたブロック（描画の色分け用）
 
   function clampDens(n) {
     if (isNaN(n)) return 2;
@@ -75,6 +81,39 @@ window.createWidgetBomber = function (ctx) {
   // ---- 盤面生成 ----
   const isWallCell = (r, c) => r === 0 || c === 0 || r === ROWS - 1 || c === COLS - 1 ||
                                (r % 2 === 0 && c % 2 === 0);
+
+  // 外周から内側へ渦巻き状にマスを並べる（恒久ピラーは除外）。サドンデスの積み順
+  function buildSpiral() {
+    const order = [];
+    let top = 1, bottom = ROWS - 2, left = 1, right = COLS - 2;
+    while (top <= bottom && left <= right) {
+      for (let c = left; c <= right; c++) order.push([top, c]);
+      for (let r = top + 1; r <= bottom; r++) order.push([r, right]);
+      if (top < bottom) for (let c = right - 1; c >= left; c--) order.push([bottom, c]);
+      if (left < right) for (let r = bottom - 1; r > top; r--) order.push([r, left]);
+      top++; bottom--; left++; right--;
+    }
+    return order.filter(([r, c]) => !(r % 2 === 0 && c % 2 === 0)).map(([r, c]) => ({ r, c }));
+  }
+
+  // サドンデス：1 マスを壁にして、その上のプレイヤー・爆弾・アイテムを潰す
+  function dropWall(cell) {
+    const { r, c } = cell;
+    if (grid[r][c] === 2) return;
+    grid[r][c] = 2;
+    sdWalls.add(`${r},${c}`);
+    const pu = powerAt(r, c);
+    if (pu) powerups.splice(powerups.indexOf(pu), 1);
+    const bb = bombAt(r, c);
+    if (bb) { const o = players[bb.owner]; if (o) o.bombs = Math.max(0, o.bombs - 1); bombs.splice(bombs.indexOf(bb), 1); }
+    for (const pl of players) {
+      if (!pl.alive) continue;
+      const onCell = Math.floor(pl.x) === c && Math.floor(pl.y) === r;
+      const intoCell = pl.moving && Math.round(pl.tx - 0.5) === c && Math.round(pl.ty - 0.5) === r;
+      if (onCell || intoCell) pl.alive = false;
+    }
+    flames.push({ r, c, t: 0.18 }); // 着弾フラッシュ
+  }
 
   // 現在のサイズから 4 隅スポーンを求める
   const spawnsFor = () => [
@@ -116,6 +155,13 @@ window.createWidgetBomber = function (ctx) {
       maxBombs: 1, bombs: 0, power: 2, speed: 3.2,
       think: 0, lastDir: null
     }));
+    // サドンデス準備：盤面が大きいほど 1 枚を速く積み、ROUND_LIMIT 手前で積み終える
+    spiral = buildSpiral();
+    sdIndex = 0;
+    sdAccum = 0;
+    sdWalls.clear();
+    sdInterval = Math.max(0.12, (ROUND_LIMIT - 6 - SD_START) / Math.max(1, spiral.length));
+
     state = 'play';
     restartCountdown = -1;
     roundTime = 0;
@@ -386,6 +432,15 @@ window.createWidgetBomber = function (ctx) {
       if (flameAt(Math.floor(pl.y), Math.floor(pl.x))) pl.alive = false;
     }
 
+    // サドンデス：一定時間を過ぎると外周からブロックが積まれて盤面が狭まる
+    if (roundTime > SD_START && sdIndex < spiral.length) {
+      sdAccum += dt;
+      while (sdAccum >= sdInterval && sdIndex < spiral.length) {
+        sdAccum -= sdInterval;
+        dropWall(spiral[sdIndex++]);
+      }
+    }
+
     // 決着判定
     const alive = players.filter((p) => p.alive);
     if (state === 'play' && (alive.length <= 1 || roundTime > ROUND_LIMIT)) {
@@ -459,9 +514,11 @@ window.createWidgetBomber = function (ctx) {
           g2d.fillStyle = (r + c) % 2 ? '#2f8a40' : '#2a8038';
           g2d.fillRect(x, y, scale + 1, scale + 1);
         } else if (t === 2) {
-          g2d.fillStyle = '#6b7785';
+          // サドンデスで積まれた壁は赤系で「迫ってくる」感を出す
+          const sd = sdWalls.has(`${r},${c}`);
+          g2d.fillStyle = sd ? '#8a4a4a' : '#6b7785';
           g2d.fillRect(x, y, scale, scale);
-          g2d.fillStyle = '#8893a0';
+          g2d.fillStyle = sd ? '#a86060' : '#8893a0';
           g2d.fillRect(x + scale * 0.12, y + scale * 0.12, scale * 0.76, scale * 0.5);
         } else {
           g2d.fillStyle = '#9c6b3f';
