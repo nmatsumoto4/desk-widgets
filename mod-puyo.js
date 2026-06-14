@@ -12,10 +12,29 @@ window.createWidgetPuyo = function (ctx) {
   const BEST_KEY = 'widgetPuyo.best';
   const GAMES_KEY = 'widgetPuyo.games';
   const MAXCHAIN_KEY = 'widgetPuyo.maxChain';
+  const REPLAY_KEY = 'widgetPuyo.replay'; // 最大連鎖時の盤面（再現用）
+  const SPAWN_COL = Math.floor((W - 1) / 2);
 
   const wrapEl = document.getElementById('puyo');
   const canvas = document.getElementById('puyo-canvas');
   const g2d = canvas.getContext('2d');
+  const ctrlEl = document.getElementById('puyo-ctrl');
+  const replayBtn = document.getElementById('puyo-replay');
+
+  // 最大連鎖の盤面を読み込んで連鎖を再生する
+  function playReplay() {
+    let data;
+    try { data = JSON.parse(localStorage.getItem(REPLAY_KEY)); } catch { data = null; }
+    if (!data || !data.grid || data.grid.length !== H || data.grid[0].length !== W) return;
+    grid = data.grid.map((row) => row.slice());
+    voff = makeVoff();
+    cur = null; popping = []; chainNum = 0; chainSeed = null;
+    over = false; replaying = true; restartCountdown = -1;
+    ctx.hideOverlay();
+    state = 'check';
+    render();
+  }
+  replayBtn.addEventListener('click', playReplay);
   const PUYO_COLORS = ['', '#e74c3c', '#27ae60', '#3498db', '#f1c40f'];
 
   // ぷよのドット絵（14×14）。B=本体 / D=影 / H=ツヤ / W=白目 / P=瞳 / .=透明
@@ -85,6 +104,8 @@ window.createWidgetPuyo = function (ctx) {
   let chainLabelTicks = 0; // 「n 連鎖!」表示の残りティック
   const makeVoff = () => Array.from({ length: H }, () => new Array(W).fill(0));
   let voff = makeVoff();   // 各セルの落下アニメ用オフセット（行単位・負=上）
+  let chainSeed = null;    // 連鎖シーケンス開始時の盤面（記録用）
+  let replaying = false;   // リプレイ再生中フラグ
 
   function rndPair() {
     const r = () => 1 + Math.floor(Math.random() * Puyo.NUM_COLORS);
@@ -207,8 +228,8 @@ window.createWidgetPuyo = function (ctx) {
 
     switch (state) {
       case 'spawn': {
-        if (grid[0][2] !== 0 || grid[1][2] !== 0) { gameOver(); break; }
-        cur = { colors: queue.shift(), r: 1, c: 2, rot: 0 };
+        if (grid[0][SPAWN_COL] !== 0 || grid[1][SPAWN_COL] !== 0) { gameOver(); break; }
+        cur = { colors: queue.shift(), r: 1, c: SPAWN_COL, rot: 0 };
         queue.push(rndPair());
         target = auto ? PuyoAI.bestPlacement(grid, cur.colors) : null;
         gravCounter = 0;
@@ -254,8 +275,10 @@ window.createWidgetPuyo = function (ctx) {
       case 'check': {
         const groups = Puyo.findGroups(grid);
         if (groups.length === 0) {
+          if (replaying) replaying = false; // リプレイ終了 → 通常へ
           state = 'spawn';
         } else {
+          if (chainNum === 0) chainSeed = grid.map((row) => row.slice()); // 連鎖開始盤面を記録
           chainNum++;
           chainLabelTicks = CHAIN_LABEL_TICKS;
           popping = groups.flat();
@@ -274,6 +297,11 @@ window.createWidgetPuyo = function (ctx) {
           if (chainNum > maxChain) {
             maxChain = chainNum;
             localStorage.setItem(MAXCHAIN_KEY, String(maxChain));
+            // 最大連鎖を更新 → その連鎖を生んだ盤面を保存（再現用）
+            if (chainSeed && !replaying) {
+              localStorage.setItem(REPLAY_KEY, JSON.stringify({ chain: maxChain, grid: chainSeed }));
+              replayBtn.disabled = false;
+            }
           }
           applyGravityAnimated();
           updateScores();
@@ -397,6 +425,8 @@ window.createWidgetPuyo = function (ctx) {
     name: 'puyo',
     show() {
       wrapEl.style.display = 'flex';
+      ctrlEl.style.display = 'inline-flex';
+      replayBtn.disabled = !localStorage.getItem(REPLAY_KEY);
       relayout();
       updateScores();
       if (timer === null) timer = setInterval(tick, TICK_MS);
@@ -405,6 +435,7 @@ window.createWidgetPuyo = function (ctx) {
       clearInterval(timer);
       timer = null;
       wrapEl.style.display = 'none';
+      ctrlEl.style.display = 'none';
     },
     setAuto(on) {
       auto = on;
@@ -430,7 +461,8 @@ window.createWidgetPuyo = function (ctx) {
     // テスト用フック：ティックを直接駆動し内部状態を覗く
     _tick: tick,
     _grid: () => grid,
-    _state: () => ({ state, score, chainNum, maxChain, over, auto,
-                     filled: grid.flat().filter(Boolean).length })
+    _replay: playReplay,
+    _state: () => ({ state, score, chainNum, maxChain, over, auto, replaying,
+                     W, H, filled: grid.flat().filter(Boolean).length })
   };
 };

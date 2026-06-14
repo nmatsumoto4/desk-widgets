@@ -59,38 +59,42 @@
 
         const res = resolve(placed);
         const hs = colHeights(res.grid);
-        // 各列の埋まり高さ（0..13）
+        // 各列の埋まり高さ
         const fh = hs.map((h) => H - h);
+        const SPAWN = Math.floor((W - 1) / 2); // スポーン列（中央）
+        // 盤面の高さに応じた「我慢して積む」上限・危険水位
+        const STACK_OK = H - 5;   // この高さまでは積んで連鎖を育てる
+        const DANGER_H = H - 4;
 
         let v;
-        if (fh[2] >= H - 1) {
-          // 次のスポーン（3 列目の上 2 マス）が塞がる＝死。発火数だけで比較する最終手段
+        if (fh[SPAWN] >= H - 1) {
+          // 次のスポーンが塞がる＝死。発火数だけで比較する最終手段
           v = -1e9 + res.chains * 10;
         } else {
           const P = potential(res.grid);
           const maxFh = Math.max(...fh);
-          const danger = fh[2] >= 8 || maxFh >= 10;
+          const danger = fh[SPAWN] >= STACK_OK || maxFh >= DANGER_H;
 
           v = 0;
           if (danger) {
             // 危険水位：生存最優先。持っている連鎖を惜しまず発火する
             v += res.chains * 2500 + res.chains * res.chains * 320;
-          } else if (res.chains >= 4) {
-            // 育った連鎖の発火は大きく評価
-            v += res.chains * res.chains * 420;
+          } else if (res.chains >= 5) {
+            // 大きく育った連鎖の発火を高評価（大連鎖狙い）
+            v += res.chains * res.chains * 460;
           } else if (res.chains >= 1) {
-            // 育成中の小連鎖発火は種の浪費なので抑制
-            v -= 280;
+            // 育成中の発火は種の浪費なので抑制（より長く我慢）
+            v -= 360;
           }
           // 連鎖ポテンシャルを育てる（高ポテンシャルほど加速度的に評価）
-          v += P * 420 + P * P * 130;
+          v += P * 440 + P * P * 150;
           v += linkScore(res.grid) * 18;
-          // 高さペナルティ（高く積みすぎない・3 列目は特に低く保つ）
+          // 高さペナルティ（積みすぎ防止・スポーン列は低く保つ）
           for (let c = 0; c < W; c++) {
-            const over = Math.max(0, fh[c] - 8);
+            const over = Math.max(0, fh[c] - STACK_OK);
             v -= over * over * 30;
           }
-          v -= fh[2] * 45;
+          v -= fh[SPAWN] * 30;
           // 凸凹は操作の自由度を下げるので軽く減点
           for (let c = 0; c + 1 < W; c++) v -= Math.abs(fh[c] - fh[c + 1]) * 4;
         }

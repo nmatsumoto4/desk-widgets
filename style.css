@@ -237,6 +237,21 @@ html, body {
 #breakout-ctrl button:hover { background: #b8ab9d; }
 #breakout-lv-label { font-weight: bold; }
 
+/* ぷよぷよのリプレイ（puyo モード時のみ表示） */
+#puyo-ctrl { display: none; align-items: center; }
+#puyo-replay {
+  border: none;
+  background: #cdc1b4;
+  color: var(--text-dark);
+  border-radius: 3px;
+  font-size: inherit;
+  font-weight: bold;
+  padding: 1px 5px;
+  cursor: pointer;
+}
+#puyo-replay:hover { background: #b8ab9d; }
+#puyo-replay:disabled { opacity: 0.45; cursor: default; }
+
 /* ライフゲームのプリセット選択（life モード時のみ表示） */
 #life-ctrl {
   display: none;
