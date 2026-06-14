@@ -1,7 +1,7 @@
 {
   "name": "desk-widgets",
-  "version": "1.0.1",
-  "description": "Desktop widgets: self-playing 2048 / Puyo Puyo / Rush Hour",
+  "version": "1.0.2",
+  "description": "Desktop widgets: self-playing 2048 / Puyo Puyo / Rush Hour / Space Invaders",
   "main": "main.js",
   "author": "nmatsumoto4",
   "license": "MIT",
