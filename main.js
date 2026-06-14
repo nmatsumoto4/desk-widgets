@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen, ipcMain, globalShortcut } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, globalShortcut, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 
 const WIDTH = 280;
@@ -63,13 +63,52 @@ function createWindow(mode) {
 }
 
 // すべてのウィジェットを一括で隠す／再表示する
+function setAllVisible(visible) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (visible) w.showInactive();
+    else w.hide();
+  }
+}
 function toggleHideAll() {
   const wins = BrowserWindow.getAllWindows();
   if (wins.length === 0) return;
-  const anyVisible = wins.some((w) => w.isVisible());
-  for (const w of wins) {
-    if (anyVisible) w.hide();
-    else w.showInactive();
+  setAllVisible(!wins.some((w) => w.isVisible()));
+}
+
+// メニューバー（トレイ）アイコン：ショートカット以外で復帰できる導線
+let tray = null;
+function buildTrayIcon() {
+  const S = 16;
+  const buf = Buffer.alloc(S * S * 4); // BGRA（初期値 0 = 透明）
+  const dots = [[2, 2], [9, 2], [2, 9], [9, 9]];
+  for (const [ox, oy] of dots) {
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 5; x++) {
+        const i = ((oy + y) * S + (ox + x)) * 4;
+        buf[i] = 34; buf[i + 1] = 126; buf[i + 2] = 230; buf[i + 3] = 255; // オレンジ #e67e22
+      }
+    }
+  }
+  return nativeImage.createFromBitmap(buf, { width: S, height: S });
+}
+function createTray() {
+  try {
+    tray = new Tray(buildTrayIcon());
+    tray.setToolTip('DeskWidgets');
+    const menu = Menu.buildFromTemplate([
+      { label: 'ウィジェットを表示 / 隠す', click: toggleHideAll },
+      { label: 'すべて表示', click: () => setAllVisible(true) },
+      { type: 'separator' },
+      { label: '新しいウィジェットを追加', click: () => createWindow() },
+      { type: 'separator' },
+      { label: '終了', click: () => app.quit() }
+    ]);
+    tray.setContextMenu(menu);
+    // 左クリックでも表示を復帰（macOS はメニューが開く）
+    tray.on('click', () => setAllVisible(true));
+    console.log('[deskwidgets] tray created');
+  } catch (e) {
+    console.log('[deskwidgets] tray failed:', e.message);
   }
 }
 
@@ -85,7 +124,11 @@ function registerHideShortcut() {
 app.whenReady().then(() => {
   createWindow();
   registerHideShortcut();
+  createTray();
 });
+
+// Dock アイコン（macOS）クリックで復帰
+app.on('activate', () => setAllVisible(true));
 
 // 「＋」ボタン：現在のモードを引き継いだ新しいウィジェットを開く
 ipcMain.on('new-widget', (_event, mode) => createWindow(mode));
