@@ -11,6 +11,19 @@ const GAP = 12;
 const PER_ROW = 4; // 横に並べる最大数（超えたら一段上に積む）
 
 let windowCount = 0;
+let onTop = true; // true=前面（常に最前面）/ false=背面（他ウィンドウの後ろ＝デスクトップ寄り）
+
+// 前面/背面をウィンドウへ適用
+function applyLayer(win) {
+  if (onTop) win.setAlwaysOnTop(true, 'floating');
+  else { win.setAlwaysOnTop(false); win.moveTop && win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); }
+}
+function setLayer(top) {
+  onTop = top;
+  for (const w of BrowserWindow.getAllWindows()) applyLayer(w);
+  if (tray) tray.setContextMenu(buildTrayMenu());
+}
+function toggleLayer() { setLayer(!onTop); }
 
 function createWindow(mode) {
   const { workArea } = screen.getPrimaryDisplay();
@@ -39,7 +52,7 @@ function createWindow(mode) {
     minHeight: 219,
     maxWidth: 440,
     maxHeight: 566,
-    alwaysOnTop: true,
+    alwaysOnTop: onTop,
     skipTaskbar: true,
     hasShadow: true,
     show: false,
@@ -54,7 +67,7 @@ function createWindow(mode) {
     }
   });
 
-  win.setAlwaysOnTop(true, 'floating');
+  applyLayer(win);
   win.setAspectRatio(WIDTH / HEIGHT);
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
@@ -116,17 +129,7 @@ function createTray() {
     tray = new Tray(icon);
     tray.setToolTip(APP_NAME);
     if (isMac) tray.setTitle(` ${APP_NAME}`); // メニューバーに名前を表示
-    const menu = Menu.buildFromTemplate([
-      { label: APP_NAME, enabled: false },
-      { type: 'separator' },
-      { label: 'ウィジェットを表示 / 隠す', click: toggleHideAll },
-      { label: 'すべて表示', click: () => setAllVisible(true) },
-      { type: 'separator' },
-      { label: '新しいウィジェットを追加', click: () => createWindow() },
-      { type: 'separator' },
-      { label: '終了', click: () => app.quit() }
-    ]);
-    tray.setContextMenu(menu);
+    tray.setContextMenu(buildTrayMenu());
     tray.on('click', () => setAllVisible(true));
     console.log('[retrocenter] tray created');
   } catch (e) {
@@ -134,18 +137,36 @@ function createTray() {
   }
 }
 
-// 一括非表示のグローバルショートカット（候補を順に試し、空いているものを登録）
-let hideAllAccelerator = null;
-function registerHideShortcut() {
-  for (const acc of ['CommandOrControl+Shift+H', 'CommandOrControl+Alt+H', 'CommandOrControl+Shift+0']) {
-    if (globalShortcut.register(acc, toggleHideAll)) { hideAllAccelerator = acc; break; }
-  }
-  console.log('[deskwidgets] hide-all shortcut:', hideAllAccelerator || '(登録失敗)');
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: APP_NAME, enabled: false },
+    { type: 'separator' },
+    { label: 'ウィジェットを表示 / 隠す', click: toggleHideAll },
+    { label: 'すべて表示', click: () => setAllVisible(true) },
+    { type: 'separator' },
+    { label: onTop ? '✓ 前面に表示' : '前面に表示', click: () => setLayer(true) },
+    { label: !onTop ? '✓ 背面に表示（デスクトップ寄り）' : '背面に表示（デスクトップ寄り）', click: () => setLayer(false) },
+    { type: 'separator' },
+    { label: '新しいウィジェットを追加', click: () => createWindow() },
+    { type: 'separator' },
+    { label: '終了', click: () => app.quit() }
+  ]);
+}
+
+// グローバルショートカット（候補を順に試し、空いているものを登録）
+function registerShortcut(cands, fn, label) {
+  let chosen = null;
+  for (const acc of cands) { if (globalShortcut.register(acc, fn)) { chosen = acc; break; } }
+  console.log(`[retrocenter] ${label} shortcut:`, chosen || '(登録失敗)');
+}
+function registerShortcuts() {
+  registerShortcut(['CommandOrControl+Shift+H', 'CommandOrControl+Alt+H', 'CommandOrControl+Shift+0'], toggleHideAll, 'hide-all');
+  registerShortcut(['CommandOrControl+Shift+B', 'CommandOrControl+Alt+B', 'CommandOrControl+Shift+9'], toggleLayer, 'layer');
 }
 
 app.whenReady().then(() => {
   createWindow();
-  registerHideShortcut();
+  registerShortcuts();
   createTray();
 });
 
@@ -157,6 +178,10 @@ ipcMain.on('new-widget', (_event, mode) => createWindow(mode));
 
 // ボタンからの一括非表示トグル
 ipcMain.on('toggle-hide-all', () => toggleHideAll());
+// 前面/背面の切替・取得
+ipcMain.on('toggle-layer', () => toggleLayer());
+ipcMain.on('set-layer', (_e, top) => setLayer(!!top));
+ipcMain.handle('layer-on-top', () => onTop);
 // テスト・確認用：表示中ウィンドウ数
 ipcMain.handle('widgets-visible-count', () => BrowserWindow.getAllWindows().filter((w) => w.isVisible()).length);
 

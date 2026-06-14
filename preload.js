@@ -6,5 +6,9 @@ contextBridge.exposeInMainWorld('widgetAPI', {
   newWidget: (mode) => ipcRenderer.send('new-widget', mode),
   // すべてのウィジェットを一括で隠す／再表示する
   toggleHideAll: () => ipcRenderer.send('toggle-hide-all'),
-  widgetsVisibleCount: () => ipcRenderer.invoke('widgets-visible-count')
+  widgetsVisibleCount: () => ipcRenderer.invoke('widgets-visible-count'),
+  // 前面/背面の切替
+  toggleLayer: () => ipcRenderer.send('toggle-layer'),
+  setLayer: (top) => ipcRenderer.send('set-layer', top),
+  layerOnTop: () => ipcRenderer.invoke('layer-on-top')
 });
