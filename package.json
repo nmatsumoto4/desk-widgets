@@ -1,6 +1,6 @@
 {
   "name": "desk-widgets",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Desktop widgets: self-playing 2048 / Puyo Puyo / Rush Hour / Space Invaders / Bomberman",
   "main": "main.js",
   "author": "nmatsumoto4",

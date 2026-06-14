@@ -35,6 +35,19 @@ window.createWidgetBomber = function (ctx) {
   const P_COLORS = ['#ecf0f1', '#34495e', '#e74c3c', '#3498db'];
   const P_ACCENT = ['#bdc3c7', '#1b2631', '#922b21', '#1f618d'];
 
+  // ドット絵ロボット（8×10）。B=本体色 / D=濃色 / E=目（発光）/ A=アンテナ
+  // 2 フレームで脚を動かして歩行アニメにする
+  const ROBOT_FRAMES = [
+    [
+      '...A....', '...D....', '.DDDDDD.', '.DBBBBD.', '.BEBBEB.',
+      '.DBBBBD.', 'DDBBBBDD', '.BBBBBB.', '.DD..DD.', '.D....D.'
+    ],
+    [
+      '...A....', '...D....', '.DDDDDD.', '.DBBBBD.', '.BEBBEB.',
+      '.DBBBBD.', 'DDBBBBDD', '.BBBBBB.', '..DDDD..', '..D..D..'
+    ]
+  ];
+
   const savedDens = localStorage.getItem(DENS_KEY);
   let densIdx = savedDens === null ? 2 : clampDens(Number(savedDens));
   let grid = [];             // 0 空き / 1 ソフト / 2 壁
@@ -50,6 +63,7 @@ window.createWidgetBomber = function (ctx) {
   let restartCountdown = -1;
   let roundTime = 0;
   let winnerText = '';
+  let animClock = 0;        // 歩行アニメ用クロック（秒）
 
   function clampDens(n) {
     if (isNaN(n)) return 2;
@@ -323,6 +337,7 @@ window.createWidgetBomber = function (ctx) {
 
     const dt = TICK_MS / 1000;
     roundTime += dt;
+    animClock += dt;
 
     // 爆弾
     for (const b of bombs.slice()) {
@@ -460,19 +475,31 @@ window.createWidgetBomber = function (ctx) {
       g2d.fillRect(x + scale * 0.24, y + scale * 0.24, scale * 0.52, scale * 0.52);
     }
 
-    // プレイヤー
+    // プレイヤー（ドット絵ロボット）
     for (const pl of players) {
-      if (!pl.alive) continue;
-      const x = sx(0) + pl.x * scale, y = sy(0) + pl.y * scale;
-      const rad = scale * 0.36;
-      g2d.fillStyle = pl.accent;
-      g2d.beginPath(); g2d.arc(x, y + rad * 0.4, rad, 0, Math.PI * 2); g2d.fill();
-      g2d.fillStyle = pl.color;
-      g2d.beginPath(); g2d.arc(x, y - rad * 0.1, rad * 0.95, 0, Math.PI * 2); g2d.fill();
-      // 目
-      g2d.fillStyle = '#222';
-      g2d.fillRect(x - rad * 0.4, y - rad * 0.3, rad * 0.22, rad * 0.4);
-      g2d.fillRect(x + rad * 0.2, y - rad * 0.3, rad * 0.22, rad * 0.4);
+      if (pl.alive) drawRobot(pl);
+    }
+  }
+
+  function drawRobot(pl) {
+    const cols = 8, rows = ROBOT_FRAMES[0].length;
+    // 歩行中だけ脚を動かし、わずかに上下する
+    const stepping = pl.moving && (Math.floor(animClock / 0.13) % 2 === 1);
+    const pat = ROBOT_FRAMES[stepping ? 1 : 0];
+    const dot = scale * 0.135;
+    const w = cols * dot, h = rows * dot;
+    const bob = stepping ? -dot * 0.6 : 0;
+    const cx = offX + pl.x * scale, cy = offY + pl.y * scale;
+    const ox = cx - w / 2, oy = cy - h / 2 + bob;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const ch = pat[r][c];
+        if (ch === '.') continue;
+        g2d.fillStyle = ch === 'B' ? pl.color : ch === 'D' ? pl.accent
+          : ch === 'E' ? '#9fefff' : '#ff5252';
+        g2d.fillRect(Math.floor(ox + c * dot), Math.floor(oy + r * dot),
+          Math.ceil(dot), Math.ceil(dot));
+      }
     }
   }
 
