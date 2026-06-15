@@ -1,7 +1,7 @@
 {
   "name": "the-retro-center",
-  "version": "1.0.4",
-  "description": "THE RETRO CENTER — desktop widgets of self-playing retro games (2048 / Puyo Puyo / Rush Hour / Invaders / Bomberman / Tetris / Snake / Life)",
+  "version": "1.0.5",
+  "description": "THE RETRO CENTER — desktop widgets of self-playing retro games (2048 / Puyo / Invaders / Bomberman / Tetris / Snake / Life / Breakout / Tower Defense / Hero / Pac-Man / Tron / FX)",
   "main": "main.js",
   "author": "nmatsumoto4",
   "license": "MIT",
