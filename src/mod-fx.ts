@@ -10,6 +10,7 @@ interface Trade { i: number; price: number; dir: number; }
 window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
   const TICK_MS = 33;
   const BEST_KEY = 'widgetFX.best';
+  const CUM_KEY = 'widgetFX.cum';        // 確定損益の生涯累計（アプリを閉じても保持）
   const MODE_KEY = 'widgetFX.mode';
   const WIN = 90;
   const RUN_LEN = 420;
@@ -37,8 +38,9 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
   let liveStatus: '—' | '取得中…' | 'LIVE' | '取得失敗' = '—';
   let liveUpdated = '', pollCd = 0, fetching = false;
 
-  // 口座（モード共通の現在ラン）
-  let pos = 0, entry = 0, realized = 0, trades: Trade[] = [];
+  // 口座。lifePnL（確定損益の生涯累計）は localStorage に保存し、アプリを閉じても引き継ぐ
+  let pos = 0, entry = 0, trades: Trade[] = [];
+  let lifePnL = Number(localStorage.getItem(CUM_KEY) || 0);
   let best = Number(localStorage.getItem(BEST_KEY) || 0);
   let humanPaused = false, flash = 0, flashDir = 0, clock = 0;
   let auto = false, timer: any = null;
@@ -49,12 +51,16 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
   const cur = () => (mode === 'sim' ? i : liveSeries.length - 1);
   const price = () => S()[cur()] ?? 0;
   const unrealized = () => (pos === 0 ? 0 : pos * UNITS * (price() - entry));
-  const equity = () => START_EQUITY + realized + unrealized();
-  const totalPnL = () => equity() - START_EQUITY;
+  const total = () => lifePnL + unrealized();          // 累計確定 ＋ 現在の含み
+  const equity = () => START_EQUITY + total();
+  const persist = () => localStorage.setItem(CUM_KEY, String(Math.round(lifePnL)));
 
-  function resetAccount() { pos = 0; entry = 0; realized = 0; trades = []; humanPaused = false; flash = 0; }
+  function resetAccount() { pos = 0; entry = 0; trades = []; humanPaused = false; flash = 0; }
+  // 現在のポジションを今の価格で決済し、損益を生涯累計へ確定（保存）
+  function closePosition() { if (pos !== 0) { lifePnL += pos * UNITS * (price() - entry) - UNITS * SPREAD; pos = 0; entry = 0; persist(); } }
 
   function newRun() {
+    closePosition();
     const maxStart = Math.max(1, histPrices.length - 60);
     runStart = 40 + ((Math.random() * Math.max(1, maxStart - 60)) | 0);
     runEnd = Math.min(histPrices.length - 1, runStart + RUN_LEN);
@@ -63,6 +69,7 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
   }
 
   function startLive() {
+    closePosition();
     const n = WIN + 8;
     liveSeries = histPrices.slice(-n).slice();
     liveDates = histDates.slice(-n).slice();
@@ -99,6 +106,7 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
 
   function setFxMode(m: 'sim' | 'live') {
     if (m === mode) return;
+    closePosition();                                 // モード切替前に今の価格で決済（累計へ確定）
     mode = m; localStorage.setItem(MODE_KEY, m);
     if (m === 'sim') { newRun(); } else { startLive(); }
     syncModeBtn();
@@ -107,7 +115,7 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
 
   function fmt(n: number) { const s = n >= 0 ? '+' : '-'; return s + '¥' + Math.abs(Math.round(n)).toLocaleString('en-US'); }
   function updateScores() {
-    const t = totalPnL();
+    const t = total();
     if (t > best) { best = t; localStorage.setItem(BEST_KEY, String(Math.round(best))); }
     const p = pos > 0 ? 'L' : pos < 0 ? 'S' : '—';
     ctx.setScores(fmt(t), fmt(best), `${p} ${price().toFixed(2)}`);
@@ -115,9 +123,9 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
 
   function setPosition(target: number) {
     if (target === pos) return;
-    if (pos !== 0) realized += pos * UNITS * (price() - entry) - UNITS * SPREAD;
-    if (target !== 0) { entry = price(); realized -= UNITS * SPREAD; trades.push({ i: cur(), price: price(), dir: target }); }
-    pos = target; updateScores();
+    if (pos !== 0) lifePnL += pos * UNITS * (price() - entry) - UNITS * SPREAD;   // 決済を累計へ確定
+    if (target !== 0) { entry = price(); lifePnL -= UNITS * SPREAD; trades.push({ i: cur(), price: price(), dir: target }); }
+    pos = target; persist(); updateScores();
   }
 
   // ---- AI：移動平均クロスで方向予測 ----
@@ -215,7 +223,7 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
 
     // 損益パネル
     const py = chartBot + Math.round(H * 0.03);
-    const u = unrealized(), tot = totalPnL();
+    const u = unrealized(), tot = total();
     const posLabel = pos > 0 ? 'ロング ▲' : pos < 0 ? 'ショート ▼' : 'ノーポジ';
     const posCol = pos > 0 ? up : pos < 0 ? down : '#9fb0c0';
     g2d.textAlign = 'left'; g2d.fillStyle = '#6b7785'; g2d.font = `${Math.round(H * 0.026)}px sans-serif`;
@@ -228,7 +236,7 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
       g2d.textAlign = 'right'; g2d.fillStyle = val >= 0 ? up : down; g2d.font = `bold ${Math.round(H * (big ? 0.046 : 0.034))}px sans-serif`; g2d.fillText(fmt(val), W - pad, yy);
     };
     row('含み損益', u, py + H * 0.135);
-    row('確定損益', realized, py + H * 0.18);
+    row('確定損益(累計)', lifePnL, py + H * 0.18);
     g2d.strokeStyle = 'rgba(120,150,180,0.15)'; g2d.beginPath(); g2d.moveTo(pad, py + H * 0.20); g2d.lineTo(W - pad, py + H * 0.20); g2d.stroke();
     row('総収益', tot, py + H * 0.255, true);
     g2d.textAlign = 'left'; g2d.fillStyle = '#46505c'; g2d.font = `${Math.round(H * 0.024)}px sans-serif`;
@@ -256,6 +264,6 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
     },
     relayout, reset: () => { if (mode === 'sim') newRun(); else startLive(); }, isOver: () => false,
     _tick: tick,
-    _state: () => ({ mode, i: cur(), date: Dt()[cur()], price: price(), pos, entry, realized: Math.round(realized), unrealized: Math.round(unrealized()), total: Math.round(totalPnL()), equity: Math.round(equity()), session, best: Math.round(best), trades: trades.length, liveStatus, liveUpdated }),
+    _state: () => ({ mode, i: cur(), date: Dt()[cur()], price: price(), pos, entry, lifePnL: Math.round(lifePnL), unrealized: Math.round(unrealized()), total: Math.round(total()), equity: Math.round(equity()), session, best: Math.round(best), trades: trades.length, liveStatus, liveUpdated }),
   };
 };
