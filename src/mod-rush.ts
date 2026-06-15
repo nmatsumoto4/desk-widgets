@@ -9,7 +9,7 @@ window.createWidgetRush = function (ctx) {
   const CELEBRATE_TICKS = 10;
   const CARS_KEY = 'widgetRush.cars';
   const TOTAL_KEY = 'widgetRush.total';
-  const CARS_MIN = 6, CARS_MAX = 12, CARS_DEFAULT = 10;
+  const CARS_MIN = 10, CARS_MAX = 28, CARS_DEFAULT = 18;
 
   const wrapEl = document.getElementById('rush');
   const canvas = document.getElementById('rush-canvas') as HTMLCanvasElement;
@@ -45,11 +45,11 @@ window.createWidgetRush = function (ctx) {
 
   function newPuzzle() {
     // 目標手数は台数に応じて引き上げる（デフォルトで複雑な問題）
-    let res = window.Rush.genPuzzle(carCount, { target: 12 + carCount, budgetMs: 700 });
-    if (!res) res = window.Rush.genPuzzle(carCount, { target: 4, budgetMs: 1500 });
+    let res = window.Rush.genPuzzle(carCount, { target: 18 + Math.round(carCount * 0.5), budgetMs: 500 });
+    if (!res) res = window.Rush.genPuzzle(carCount, { target: 10, budgetMs: 700 });
     if (!res) { // 理論上ほぼ到達しないが、台数を 1 減らして救済
       carCount = clampCars(carCount - 1);
-      res = window.Rush.genPuzzle(carCount, { target: 4, budgetMs: 1500 });
+      res = window.Rush.genPuzzle(carCount, { target: 10, budgetMs: 700 });
     }
     vehicles = res.vehicles;
     plan = res.sol;
@@ -67,7 +67,7 @@ window.createWidgetRush = function (ctx) {
   }
 
   function updateScores() {
-    ctx.setScores(session, total, `${carCount} 台・最短 ${minMoves} 手`);
+    ctx.setScores(session, total, `${carCount} 台・${minMoves} 手`);
   }
 
   function updateCarsLabel() {
@@ -91,7 +91,7 @@ window.createWidgetRush = function (ctx) {
         total++;
         localStorage.setItem(TOTAL_KEY, String(total));
         if (window.SFX) window.SFX.win();
-        ctx.showOverlay('CLEAR!', `${movesUsed} 手（最短 ${minMoves} 手）`);
+        ctx.showOverlay('CLEAR!', `${movesUsed} 手で脱出`);
         updateScores();
       }
       render();
