@@ -1,0 +1,73 @@
+name: Release
+
+# リリースタグ（v*）を push すると、mac と Windows をビルドして
+# そのタグの GitHub Release を作成し、成果物（dmg/zip/exe）を添付する。
+# 既存タグへ手動で流す場合は workflow_dispatch で tag を指定して実行。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'リリースタグ（例: v1.0.6）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --mac
+          - os: windows-latest
+            args: --win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout (tag)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        run: npm ci
+      - name: Build (esbuild)
+        run: npm run build
+      - name: Package (electron-builder)
+        run: npx electron-builder ${{ matrix.args }} --publish never
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create / update release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          shopt -s globstar nullglob
+          files=(artifacts/**/*.dmg artifacts/**/*.zip artifacts/**/*.exe)
+          echo "Assets:"; printf ' - %s\n' "${files[@]}"
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "THE RETRO CENTER $TAG" --generate-notes
+          gh release upload "$TAG" "${files[@]}" --clobber
