@@ -13,6 +13,8 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
   const CUM_KEY = 'widgetFX.cum';        // 確定損益の生涯累計（アプリを閉じても保持）
   const MODE_KEY = 'widgetFX.mode';
   const WIN = 90;
+  const CP = 3;              // ローソク 1 本に集約する終値の本数（実終値から始/高/安/終を作る）
+  const MA1 = 5, MA2 = 25;   // 移動平均（短期 / 長期）
   const RUN_LEN = 420;
   const UNITS = 10000;       // 取引数量(USD)。1 円動くと ¥10,000 の損益
   const SPREAD = 0.02;
@@ -215,11 +217,39 @@ window.createWidgetFX = function (ctx: WidgetCtx): WidgetModule {
 
     if (pos !== 0) { g2d.strokeStyle = pos > 0 ? 'rgba(38,194,129,0.6)' : 'rgba(224,83,61,0.6)'; g2d.lineWidth = 1; g2d.setLineDash([5, 4]); g2d.beginPath(); g2d.moveTo(pad, Y(entry)); g2d.lineTo(W - pad, Y(entry)); g2d.stroke(); g2d.setLineDash([]); }
 
-    g2d.strokeStyle = '#7fb0e0'; g2d.lineWidth = Math.max(1.5, W * 0.006); g2d.lineJoin = 'round';
-    g2d.beginPath(); for (let k = a; k <= b; k++) { const x = X(k), y = Y(s[k]); if (k === a) g2d.moveTo(x, y); else g2d.lineTo(x, y); } g2d.stroke();
+    // ローソク足（実終値を CP 本ごとに集約：始=最初/高=最大/安=最小/終=最後）
+    const pixPerDay = (W - pad * 2) / Math.max(1, b - a);
+    const bodyW = Math.max(2, pixPerDay * CP * 0.66);
+    for (let g0 = a; g0 <= b; g0 += CP) {
+      const g1 = Math.min(g0 + CP - 1, b);
+      let o = s[g0], cl = s[g1], h = -Infinity, l = Infinity;
+      for (let k = g0; k <= g1; k++) { if (s[k] > h) h = s[k]; if (s[k] < l) l = s[k]; }
+      const cx = X((g0 + g1) / 2), cc2 = cl >= o ? up : down;
+      g2d.strokeStyle = cc2; g2d.lineWidth = Math.max(1, W * 0.004);
+      g2d.beginPath(); g2d.moveTo(cx, Y(h)); g2d.lineTo(cx, Y(l)); g2d.stroke();
+      g2d.fillStyle = cc2;
+      const yo = Y(o), yc = Y(cl);
+      g2d.fillRect(cx - bodyW / 2, Math.min(yo, yc), bodyW, Math.max(1.5, Math.abs(yc - yo)));
+    }
+
+    // 移動平均線（終値ベース）
+    const drawMA = (n: number, color: string) => {
+      g2d.strokeStyle = color; g2d.lineWidth = Math.max(1.2, W * 0.0045); g2d.lineJoin = 'round'; g2d.beginPath(); let started = false;
+      for (let k = a; k <= b; k++) { if (k < n - 1) continue; let sum = 0; for (let j = k - n + 1; j <= k; j++) sum += s[j]; const x = X(k), y = Y(sum / n); if (!started) { g2d.moveTo(x, y); started = true; } else g2d.lineTo(x, y); }
+      g2d.stroke();
+    };
+    drawMA(MA1, '#5bc8ff'); drawMA(MA2, '#f0b24a');
+
+    // 現在値の発光ドット
     g2d.save(); g2d.shadowColor = col; g2d.shadowBlur = W * (mode === 'live' ? 0.05 : 0.03) * (1 + flash); g2d.fillStyle = col; g2d.beginPath(); g2d.arc(X(b), Y(price()), Math.max(2.5, W * 0.012), 0, Math.PI * 2); g2d.fill(); g2d.restore();
 
+    // 売買マーカー
     for (const t of trades) { if (t.i < a || t.i > b) continue; const x = X(t.i), y = Y(t.price); g2d.fillStyle = t.dir > 0 ? up : down; g2d.beginPath(); if (t.dir > 0) { g2d.moveTo(x, y - W * 0.02); g2d.lineTo(x - W * 0.014, y + W * 0.01); g2d.lineTo(x + W * 0.014, y + W * 0.01); } else { g2d.moveTo(x, y + W * 0.02); g2d.lineTo(x - W * 0.014, y - W * 0.01); g2d.lineTo(x + W * 0.014, y - W * 0.01); } g2d.closePath(); g2d.fill(); }
+
+    // MA 凡例
+    g2d.textAlign = 'right'; g2d.font = `${Math.round(headH * 0.18)}px sans-serif`;
+    g2d.fillStyle = '#5bc8ff'; g2d.fillText('MA' + MA1, W - pad - Math.round(headH * 0.9), chartTop + headH * 0.2);
+    g2d.fillStyle = '#f0b24a'; g2d.fillText('MA' + MA2, W - pad, chartTop + headH * 0.2);
 
     // 損益パネル
     const py = chartBot + Math.round(H * 0.03);
