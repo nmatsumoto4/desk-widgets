@@ -13,11 +13,13 @@
 |---|---|
 | macOS (Apple Silicon) | `THE RETRO CENTER-x.x.x-arm64.dmg` |
 | macOS (Intel) | `THE RETRO CENTER-x.x.x.dmg` |
-| Windows | 次回ビルドで提供予定 |
+| Windows | `THE RETRO CENTER Setup x.x.x.exe`（インストーラ）または `THE RETRO CENTER x.x.x.exe`（インストール不要） |
 
 > **macOS で「開発元を検証できません」と出る場合**（未署名のため）:
 > アプリを右クリック →「開く」で起動できます。それでも開けない場合はターミナルで
 > `xattr -cr "/Applications/THE RETRO CENTER.app"` を実行してください。
+>
+> **Windows で SmartScreen の警告が出る場合**:「詳細情報」→「実行」で起動できます。
 
 ## 機能
 
