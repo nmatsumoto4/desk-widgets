@@ -11,15 +11,13 @@
 
 | OS | ファイル |
 |---|---|
-| macOS (Apple Silicon) | `DeskWidgets-x.x.x-arm64.dmg` |
-| macOS (Intel) | `DeskWidgets-x.x.x.dmg` |
-| Windows | `DeskWidgets-Setup-x.x.x.exe`（インストーラ）または `DeskWidgets-x.x.x-portable.exe`（インストール不要） |
+| macOS (Apple Silicon) | `THE RETRO CENTER-x.x.x-arm64.dmg` |
+| macOS (Intel) | `THE RETRO CENTER-x.x.x.dmg` |
+| Windows | 次回ビルドで提供予定 |
 
 > **macOS で「開発元を検証できません」と出る場合**（未署名のため）:
 > アプリを右クリック →「開く」で起動できます。それでも開けない場合はターミナルで
-> `xattr -cr /Applications/DeskWidgets.app` を実行してください。
->
-> **Windows で SmartScreen の警告が出る場合**:「詳細情報」→「実行」で起動できます。
+> `xattr -cr "/Applications/THE RETRO CENTER.app"` を実行してください。
 
 ## 機能
 
