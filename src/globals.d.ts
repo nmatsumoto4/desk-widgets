@@ -46,11 +46,9 @@ interface Window {
   AI: any;
   Puyo: any;
   PuyoAI: any;
-  Rush: any;
   // ゲームウィジェット ファクトリ
   createWidget2048: WidgetFactory;
   createWidgetPuyo: WidgetFactory;
-  createWidgetRush: WidgetFactory;
   createWidgetInvaders: WidgetFactory;
   createWidgetBomber: WidgetFactory;
   createWidgetTetris: WidgetFactory;

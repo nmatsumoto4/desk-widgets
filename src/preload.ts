@@ -2,7 +2,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('widgetAPI', {
-  // 新しいウィジェットウィンドウを開く（mode: '2048' | 'puyo' | 'rush' ...）
+  // 新しいウィジェットウィンドウを開く（mode: '2048' | 'puyo' | 'tetris' ...）
   newWidget: (mode?: string) => ipcRenderer.send('new-widget', mode),
   // すべてのウィジェットを一括で隠す／再表示する
   toggleHideAll: () => ipcRenderer.send('toggle-hide-all'),

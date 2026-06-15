@@ -163,19 +163,6 @@ html, body {
   border-radius: 6px;
 }
 
-/* Rush Hour 盤面 */
-#rush {
-  display: none;
-  width: 100%;
-  height: 100%;
-  align-items: flex-start;
-  justify-content: center;
-}
-
-#rush-canvas {
-  border-radius: 6px;
-}
-
 /* インベーダー盤面 */
 #invaders {
   display: none;
@@ -298,33 +285,6 @@ html, body {
 }
 
 #bomber-dens-label {
-  font-weight: bold;
-}
-
-/* Rush Hour の車台数コントロール（rush モード時のみ表示） */
-#rush-ctrl {
-  display: none;
-  align-items: center;
-  gap: 2px;
-}
-
-#rush-ctrl button {
-  border: none;
-  background: #cdc1b4;
-  color: var(--text-dark);
-  border-radius: 3px;
-  font-size: inherit;
-  font-weight: bold;
-  line-height: 1;
-  padding: 1px 5px;
-  cursor: pointer;
-}
-
-#rush-ctrl button:hover {
-  background: #b8ab9d;
-}
-
-#rush-cars-label {
   font-weight: bold;
 }
 

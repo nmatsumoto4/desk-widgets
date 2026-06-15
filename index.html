@@ -31,7 +31,6 @@
     <div id="stage">
       <div id="board"></div>
       <div id="puyo"><canvas id="puyo-canvas"></canvas></div>
-      <div id="rush"><canvas id="rush-canvas"></canvas></div>
       <div id="invaders"><canvas id="invaders-canvas"></canvas></div>
       <div id="bomber"><canvas id="bomber-canvas"></canvas></div>
       <div id="tetris"><canvas id="tetris-canvas"></canvas></div>
@@ -52,11 +51,6 @@
       <span id="mode-indicator">AI 自動運転中</span>
       <span id="puyo-ctrl">
         <button id="puyo-replay" title="最大連鎖をリプレイ">▶ﾘﾌﾟﾚｲ</button>
-      </span>
-      <span id="rush-ctrl">
-        <button id="rush-minus" title="車を減らす">−</button>
-        <span id="rush-cars-label"></span>
-        <button id="rush-plus" title="車を増やす">＋</button>
       </span>
       <span id="bomber-ctrl">
         <button id="bomber-minus" title="ブロックを減らす">−</button>
@@ -83,8 +77,6 @@
   <script src="puyo.js"></script>
   <script src="puyo-ai.js"></script>
   <script src="mod-puyo.js"></script>
-  <script src="rush.js"></script>
-  <script src="mod-rush.js"></script>
   <script src="mod-invaders.js"></script>
   <script src="mod-bomber.js"></script>
   <script src="mod-tetris.js"></script>

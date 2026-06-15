@@ -25,8 +25,6 @@
     "src/puyo.ts",
     "src/puyo-ai.ts",
     "src/mod-puyo.ts",
-    "src/rush.ts",
-    "src/mod-rush.ts",
     "src/mod-invaders.ts",
     "src/mod-bomber.ts",
     "src/mod-tetris.ts",
