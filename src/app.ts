@@ -4,9 +4,9 @@
 
 (() => {
   const MODE_KEY = 'widget.mode';
-  const MODE_ORDER = ['2048', 'puyo', 'invaders', 'bomber', 'tetris', 'snake', 'life', 'breakout', 'td', 'hero', 'pac', 'tron'];
-  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', invaders: 'インベーダー', bomber: 'ボンバーマン', tetris: 'テトリス', snake: 'スネーク', life: 'ライフゲーム', breakout: 'ブロック崩し', td: 'タワーディフェンス', hero: 'ヒーローのくせに生意気だ', pac: 'パックマン', tron: 'トロン' };
-  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', invaders: 'INV', bomber: 'ボム', tetris: 'テト', snake: 'スネク', life: 'ライフ', breakout: 'ブロック', td: 'TD', hero: '生意気', pac: 'パック', tron: 'トロン' };
+  const MODE_ORDER = ['2048', 'puyo', 'invaders', 'bomber', 'tetris', 'snake', 'life', 'breakout', 'td', 'hero', 'pac', 'tron', 'fx'];
+  const GAME_TITLES = { '2048': '2048', puyo: 'ぷよぷよ', invaders: 'インベーダー', bomber: 'ボンバーマン', tetris: 'テトリス', snake: 'スネーク', life: 'ライフゲーム', breakout: 'ブロック崩し', td: 'タワーディフェンス', hero: 'ヒーローのくせに生意気だ', pac: 'パックマン', tron: 'トロン', fx: 'FX ドル円' };
+  const GAME_SHORT = { '2048': '2048', puyo: 'ぷよ', invaders: 'INV', bomber: 'ボム', tetris: 'テト', snake: 'スネク', life: 'ライフ', breakout: 'ブロック', td: 'TD', hero: '生意気', pac: 'パック', tron: 'トロン', fx: 'FX' };
 
   const scoreEl = document.getElementById('score');
   const bestEl = document.getElementById('best');
@@ -47,7 +47,8 @@
     td: window.createWidgetTD(ctx),
     hero: window.createWidgetHero(ctx),
     pac: window.createWidgetPac(ctx),
-    tron: window.createWidgetTron(ctx)
+    tron: window.createWidgetTron(ctx),
+    fx: window.createWidgetFX(ctx)
   };
 
   // 起動モード：URL パラメータ > 前回の選択 > 2048

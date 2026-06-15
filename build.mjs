@@ -5,10 +5,10 @@
 import * as esbuild from 'esbuild';
 
 const RENDERER = [
-  'sound', 'game', 'ai', 'mod2048',
+  'sound', 'game', 'ai', 'mod2048', 'fxdata',
   'puyo', 'puyo-ai', 'mod-puyo',
   'mod-invaders', 'mod-bomber', 'mod-tetris', 'mod-snake', 'mod-life',
-  'mod-breakout', 'mod-td', 'mod-hero', 'mod-pac', 'mod-tron',
+  'mod-breakout', 'mod-td', 'mod-hero', 'mod-pac', 'mod-tron', 'mod-fx',
   'app',
 ];
 

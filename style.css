@@ -198,9 +198,42 @@ html, body {
   justify-content: center;
 }
 
-#tetris-canvas, #snake-canvas, #life-canvas, #breakout-canvas, #td-canvas, #hero-canvas, #pac-canvas, #tron-canvas {
+#tetris-canvas, #snake-canvas, #life-canvas, #breakout-canvas, #td-canvas, #hero-canvas, #pac-canvas, #tron-canvas, #fx-canvas {
   border-radius: 6px;
 }
+
+/* FX 盤面 */
+#fx {
+  display: none;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+  justify-content: center;
+}
+
+/* FX の注文ボタン（fx モード時のみ表示） */
+#fx-ctrl {
+  display: none;
+  align-items: center;
+  gap: 3px;
+}
+
+#fx-ctrl button {
+  border: none;
+  border-radius: 3px;
+  font-size: inherit;
+  font-weight: bold;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+  color: #fff;
+}
+
+#fx-buy { background: #26c281; }
+#fx-sell { background: #e0533d; }
+#fx-flat { background: #6b7785; }
+#fx-ai { background: #3d7fe0; }
+#fx-ctrl button:hover { filter: brightness(1.15); }
 
 /* ブロック崩しの開始レベル調整（breakout モード時のみ表示） */
 #breakout-ctrl {

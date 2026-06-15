@@ -18,6 +18,7 @@
   },
   "include": [
     "src/globals.d.ts",
+    "src/fxdata.ts",
     "src/sound.ts",
     "src/game.ts",
     "src/ai.ts",
@@ -35,6 +36,7 @@
     "src/mod-hero.ts",
     "src/mod-pac.ts",
     "src/mod-tron.ts",
+    "src/mod-fx.ts",
     "src/app.ts"
   ]
 }

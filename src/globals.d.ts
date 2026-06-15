@@ -39,8 +39,9 @@ interface WidgetAPI {
 }
 
 interface Window {
-  // 効果音シンセ・共通ロジック
+  // 効果音シンセ・共通ロジック・実データ
   SFX: any;
+  FXDATA: { pair: string; source?: string; dates: string[]; prices: number[] };
   Game: any;
   GAME_SIZE: number;
   AI: any;
@@ -59,6 +60,7 @@ interface Window {
   createWidgetHero: WidgetFactory;
   createWidgetPac: WidgetFactory;
   createWidgetTron: WidgetFactory;
+  createWidgetFX: WidgetFactory;
   // Electron 連携・テストフック
   widgetAPI?: WidgetAPI;
   __widget?: any;
