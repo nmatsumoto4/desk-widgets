@@ -35,6 +35,8 @@
     "src/mod-breakout.ts",
     "src/mod-td.ts",
     "src/mod-hero.ts",
+    "src/mod-pac.ts",
+    "src/mod-tron.ts",
     "src/app.ts"
   ]
 }

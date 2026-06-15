@@ -59,6 +59,8 @@ interface Window {
   createWidgetBreakout: WidgetFactory;
   createWidgetTD: WidgetFactory;
   createWidgetHero: WidgetFactory;
+  createWidgetPac: WidgetFactory;
+  createWidgetTron: WidgetFactory;
   // Electron 連携・テストフック
   widgetAPI?: WidgetAPI;
   __widget?: any;
