@@ -8,8 +8,9 @@ window.createWidgetRush = function (ctx) {
   const MOVE_EVERY = 2;     // 何ティックごとに 1 手進めるか
   const CELEBRATE_TICKS = 10;
   const CARS_KEY = 'widgetRush.cars';
+  const CARS_VER_KEY = 'widgetRush.carsVer', CARS_VER = '2';
   const TOTAL_KEY = 'widgetRush.total';
-  const CARS_MIN = 10, CARS_MAX = 28, CARS_DEFAULT = 18;
+  const CARS_MIN = 12, CARS_MAX = 42, CARS_DEFAULT = 28;
 
   const wrapEl = document.getElementById('rush');
   const canvas = document.getElementById('rush-canvas') as HTMLCanvasElement;
@@ -23,7 +24,15 @@ window.createWidgetRush = function (ctx) {
     '#34495e', '#d35400', '#7f8c8d', '#2980b9', '#16a085', '#8e44ad'
   ];
 
-  let carCount = clampCars(Number(localStorage.getItem(CARS_KEY) || CARS_DEFAULT));
+  // 既存ユーザーにも新デフォルト（多めの台数）を一度だけ反映してから、以後は +/- の調整を尊重
+  let carCount = (() => {
+    if (localStorage.getItem(CARS_VER_KEY) !== CARS_VER) {
+      localStorage.setItem(CARS_KEY, String(CARS_DEFAULT));
+      localStorage.setItem(CARS_VER_KEY, CARS_VER);
+      return CARS_DEFAULT;
+    }
+    return clampCars(Number(localStorage.getItem(CARS_KEY) || CARS_DEFAULT));
+  })();
   let vehicles = [];
   let plan = [];
   let planPos = 0;
