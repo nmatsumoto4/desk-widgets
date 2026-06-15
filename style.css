@@ -229,6 +229,7 @@ html, body {
   color: #fff;
 }
 
+#fx-mode { background: #4a5360; }
 #fx-buy { background: #26c281; }
 #fx-sell { background: #e0533d; }
 #fx-flat { background: #6b7785; }
