@@ -104,72 +104,89 @@
     return null;
   }
 
-  // 逆生成：赤車を「出口にある＝解けた状態」から、有効な手をランダムに巻き戻して問題を作る。
-  // こうして得た配置は構成上“必ず解ける”。walkSol（巻き戻しの逆順＝正しい解）も返す。
-  function reverseGen(numCars, steps, rng) {
+  // 構築生成：赤車の前（出口までの経路）に必ず minBlockers 台以上の縦車を置き、
+  // 各ブロッカーには「出口行から外れるための退避レーン」を確保しておく（＝必ず解ける）。
+  // 飾りの車は出口行を塞がない位置にだけ置く。解は「塞いでいる車だけをどかして赤を直進」。
+  function construct(numCars, minBlockers, rng) {
     const occupied = new Set();
     const mark = (v) => cellsOf(v).forEach(([r, c]) => occupied.add(r * N + c));
-    const unmark = (v) => cellsOf(v).forEach(([r, c]) => occupied.delete(r * N + c));
+    const used = (r, c) => occupied.has(r * N + c);
     const fits = (v) => {
       if (v.r < 0 || v.c < 0) return false;
       if (v.horiz && v.c + v.len > N) return false;
       if (!v.horiz && v.r + v.len > N) return false;
-      return cellsOf(v).every(([r, c]) => !occupied.has(r * N + c));
+      return cellsOf(v).every(([r, c]) => !used(r, c));
     };
-    // 赤車は出口（右端）に置く＝ゴール状態
-    const red = { r: EXIT_ROW, c: N - 2, len: 2, horiz: true };
+
+    const red = { r: EXIT_ROW, c: (rng() * 3) | 0, len: 2, horiz: true };
     mark(red);
     const vehicles = [red];
-    // 他の車をランダム配置（出口行に水平車は置かない）
+    const sol = [];
+
+    // 赤の右側の列をシャッフルし、縦のブロッカーを置く（各々に退避レーンを予約）
+    const cols = [];
+    for (let c = red.c + red.len; c <= N - 1; c++) cols.push(c);
+    for (let i = cols.length - 1; i > 0; i--) { const j = (rng() * (i + 1)) | 0; const t = cols[i]; cols[i] = cols[j]; cols[j] = t; }
+    const want = Math.min(cols.length, Math.max(minBlockers, minBlockers + ((rng() * 3) | 0)));
+    let blockers = 0;
+    for (const c of cols) {
+      if (blockers >= want) break;
+      const len = rng() < 0.5 ? 2 : 3;
+      const rlo = Math.max(0, EXIT_ROW - len + 1), rhi = Math.min(N - len, EXIT_ROW);
+      for (let a = 0; a < 10; a++) {
+        const r = rlo + ((rng() * (rhi - rlo + 1)) | 0);
+        const v = { r, c, len, horiz: false };
+        if (!fits(v)) continue;
+        const r1 = r + len - 1;
+        const upSteps = r1 - EXIT_ROW + 1, downSteps = EXIT_ROW - r + 1;
+        const upLane = [], downLane = [];
+        for (let rr = r - 1; rr >= r - upSteps; rr--) upLane.push(rr);
+        for (let rr = r1 + 1; rr <= r1 + downSteps; rr++) downLane.push(rr);
+        const upOK = (r - upSteps) >= 0 && upLane.every((rr) => !used(rr, c));
+        const downOK = (r1 + downSteps) <= N - 1 && downLane.every((rr) => !used(rr, c));
+        let dir = 0, steps = 0, lane = null;
+        if (upOK && (!downOK || rng() < 0.5)) { dir = -1; steps = upSteps; lane = upLane; }
+        else if (downOK) { dir = 1; steps = downSteps; lane = downLane; }
+        else continue;
+        const vi = vehicles.length;
+        mark(v); for (const rr of lane) occupied.add(rr * N + c);   // 退避レーンを予約（飾りが入らないように）
+        vehicles.push(v);
+        for (let s = 0; s < steps; s++) sol.push({ idx: vi, delta: dir });
+        blockers++; break;
+      }
+    }
+    if (blockers < minBlockers) return null;   // 前に十分な障害物を置けなければ作り直し
+
+    // 飾りの車：出口行は絶対に塞がない（＝動かす必要のない車）
     let guard = 0;
-    while (vehicles.length < numCars && guard < numCars * 40) {
+    while (vehicles.length < numCars && guard < numCars * 50) {
       guard++;
-      const horiz = rng() < 0.45;
+      const horiz = rng() < 0.5;
       const len = rng() < 0.7 ? 2 : 3;
-      const r = horiz ? (() => { let rr; do { rr = Math.floor(rng() * N); } while (rr === EXIT_ROW); return rr; })() : Math.floor(rng() * (N - len + 1));
-      const c = horiz ? Math.floor(rng() * (N - len + 1)) : Math.floor(rng() * N);
+      let r, c;
+      if (horiz) { do { r = (rng() * N) | 0; } while (r === EXIT_ROW); c = (rng() * (N - len + 1)) | 0; }
+      else { c = (rng() * N) | 0; r = (rng() * (N - len + 1)) | 0; if (r <= EXIT_ROW && EXIT_ROW <= r + len - 1) continue; } // 出口行を跨がない
       const v = { r, c, len, horiz };
       if (!fits(v)) continue;
       mark(v); vehicles.push(v);
     }
-    if (vehicles.length < 5) return null;
 
-    // ランダムウォークで巻き戻す（赤を左へ寄せる弱いバイアス＋直前手の即取消は避ける）
-    const applied = [];
-    let lastIdx = -1, lastDelta = 0;
-    for (let s = 0; s < steps; s++) {
-      const grid = buildGrid(vehicles);
-      const moves = [];
-      for (let i = 0; i < vehicles.length; i++) for (const d of [-1, 1]) { if (!canMove(vehicles, i, d, grid)) continue; if (i === lastIdx && d === -lastDelta) continue; moves.push([i, d]); }
-      if (!moves.length) break;
-      // 赤を左へ動かす手があれば優先的に（35%）選ぶ
-      let pick;
-      const redLeft = moves.find((m) => m[0] === 0 && m[1] === -1);
-      if (redLeft && rng() < 0.35) pick = redLeft; else pick = moves[(rng() * moves.length) | 0];
-      const v = vehicles[pick[0]]; unmark(v); if (v.horiz) v.c += pick[1]; else v.r += pick[1]; mark(v);
-      applied.push({ idx: pick[0], delta: pick[1] });
-      lastIdx = pick[0]; lastDelta = pick[1];
-    }
-    // 赤が出口から十分離れていなければ自明扱いで捨てる
-    if (vehicles[0].c > N - 2 - 3) return null;
-    const walkSol = applied.slice().reverse().map((m) => ({ idx: m.idx, delta: -m.delta }));
-    return { vehicles, walkSol };
+    // ブロッカーを全部どかしたら、赤は何も動かさず出口まで直進
+    const goal = N - red.len;
+    for (let cc = red.c; cc < goal; cc++) sol.push({ idx: 0, delta: 1 });
+    return { vehicles, sol };
   }
 
-  // 可解でなるべく歯ごたえのある問題を時間予算内で生成する（逆生成で“必ず解ける”）
-  // 戻り値: { vehicles, sol } （sol は A* の最短手順。見つからなければ巻き戻しの逆＝確実な手順）
-  function genPuzzle(numCars, { target = 22, budgetMs = 500 } = {}) {
+  // 問題を時間予算内で生成（構築生成なので必ず可解）。戻り値: { vehicles, sol }
+  function genPuzzle(numCars, { minBlockers = 5, budgetMs = 400 } = {}) {
     const deadline = Date.now() + budgetMs;
     const rng = Math.random;
     let best = null;
-    // 逆生成の手数 ≒ 巻き戻し歩数。target 前後を狙って巻き戻す
     while (Date.now() < deadline) {
-      const gen = reverseGen(numCars, target + ((rng() * 10) | 0), rng);
-      if (!gen) continue;
-      const sol = gen.walkSol;                  // 構成上“必ず解ける”確実な手順（A* 不要）
-      if (sol.length < 8) continue;             // 自明すぎる問題は捨てる
-      if (!best || sol.length > best.sol.length) best = { vehicles: gen.vehicles, sol };
-      if (best.sol.length >= target) break;
+      const res = construct(numCars, minBlockers, rng);
+      if (!res) continue;
+      if (!best || res.sol.length > best.sol.length) best = res;
+      if (best.sol.length >= 14) break;
     }
     return best;
   }

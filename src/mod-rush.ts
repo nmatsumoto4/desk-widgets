@@ -4,9 +4,9 @@
 
 window.createWidgetRush = function (ctx) {
   const { N, EXIT_ROW } = window.Rush;
-  const TICK_MS = 120;
-  const MOVE_EVERY = 2;     // 何ティックごとに 1 手進めるか
-  const CELEBRATE_TICKS = 10;
+  const TICK_MS = 60;
+  const MOVE_EVERY = 1;     // 何ティックごとに 1 手進めるか（AI 自動運転を高速化）
+  const CELEBRATE_TICKS = 8;
   const CARS_KEY = 'widgetRush.cars';
   const CARS_VER_KEY = 'widgetRush.carsVer', CARS_VER = '2';
   const TOTAL_KEY = 'widgetRush.total';
@@ -53,12 +53,13 @@ window.createWidgetRush = function (ctx) {
   }
 
   function newPuzzle() {
-    // 目標手数は台数に応じて引き上げる（デフォルトで複雑な問題）
-    let res = window.Rush.genPuzzle(carCount, { target: 18 + Math.round(carCount * 0.5), budgetMs: 500 });
-    if (!res) res = window.Rush.genPuzzle(carCount, { target: 10, budgetMs: 700 });
+    // 赤車の前に必ず障害物（最低 5 台、台数が多いほど増やす）を置く
+    const blockers = Math.min(9, 6 + Math.floor((carCount - 14) / 8));
+    let res = window.Rush.genPuzzle(carCount, { minBlockers: blockers, budgetMs: 450 });
+    if (!res) res = window.Rush.genPuzzle(carCount, { minBlockers: 5, budgetMs: 700 });
     if (!res) { // 理論上ほぼ到達しないが、台数を 1 減らして救済
       carCount = clampCars(carCount - 1);
-      res = window.Rush.genPuzzle(carCount, { target: 10, budgetMs: 700 });
+      res = window.Rush.genPuzzle(carCount, { minBlockers: 5, budgetMs: 700 });
     }
     vehicles = res.vehicles;
     plan = res.sol;
